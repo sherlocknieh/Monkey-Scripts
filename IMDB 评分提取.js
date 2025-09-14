@@ -55,9 +55,60 @@
         document.body.appendChild(extractButton);    // 添加按钮到 body 中
     }
 
-    // 提取剧集信息
+    // 添加创建加载动画的函数
+    function createLoadingSpinner() {
+        const spinner = document.createElement('div');
+        spinner.id = 'imdb-loading-spinner';
+        spinner.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 200px;
+            z-index: 10001;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #f5c518;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        `;
+        
+        // 添加CSS动画
+        if (!document.getElementById('spinner-style')) {
+            const style = document.createElement('style');
+            style.id = 'spinner-style';
+            style.textContent = `
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        document.body.appendChild(spinner);
+        return spinner;
+    }
+
+    // 移除加载动画
+    function removeLoadingSpinner() {
+        const spinner = document.getElementById('imdb-loading-spinner');
+        if (spinner) {
+            spinner.remove();
+        }
+    }
+
+    // 修改提取剧集信息函数
     function extractEpisodeInfo() {
         console.log('开始提取剧集信息...');
+        
+        // 显示加载动画
+        const spinner = createLoadingSpinner();
+        
+        // 禁用按钮并更改文本
+        extractButton.disabled = true;
+        extractButton.textContent = '提取中...';
+        extractButton.style.backgroundColor = '#ccc';
+        extractButton.style.cursor = 'not-allowed';
         
         setTimeout(() => {
             try {
@@ -127,6 +178,13 @@
             } catch (error) {
                 console.error('提取剧集信息时发生错误:', error);
                 alert('提取过程中发生错误，请查看控制台了解详情。');
+            } finally {
+                // 无论成功还是失败都要移除动画并恢复按钮
+                removeLoadingSpinner();
+                extractButton.disabled = false;
+                extractButton.textContent = '提取剧集信息';
+                extractButton.style.backgroundColor = '#f5c518';
+                extractButton.style.cursor = 'pointer';
             }
         }, 2000);
     }
