@@ -34,22 +34,58 @@
             right: 20px;                    /* 距离右侧 20px */
             z-index: 10000;                 /* 确保按钮在其他元素之上 */
             padding: 10px 20px;             /* 内边距: 10px 20px */
-            background-color: #f5c518;    /* 背景颜色: 黄色 */
+            background-color: #f5c518;      /* 背景颜色: 黄色 */
             color: #000;                    /* 文字颜色: 黑色 */
             border: none;                   /* 无边框 */
             border-radius: 5px;             /* 圆角: 5px */
             font-size: 14px;                /* 字体大小: 14px */
             font-weight: bold;              /* 字体加粗 */
             cursor: pointer;                /* 鼠标悬停时显示为指针 */
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);  /* 阴影: 0 2px 5px  rgba(0,0,0,0.2) */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);  /* 阴影 */
+            display: inline-flex;           /* 使用 Flexbox 布局 */
+            align-items: center;            /* 侧轴对齐: 居中 */
         `;
 
+        // 添加spinner样式到页面
+        if (!document.getElementById('spinner-style')) {
+            const style = document.createElement('style');
+            style.id = 'spinner-style';
+            style.textContent = `
+                .spinner {
+                    width: 1em; 
+                    height: 1em; 
+                    border: 2px solid rgba(0,0,0,0.3);
+                    border-top: 2px solid #000;
+                    border-radius: 50%;
+                    display: inline-block;
+                    vertical-align: baseline;
+                    margin-right: 6px;
+                    animation: spin 0.8s linear infinite;
+                }
+                
+                @keyframes spin {
+                    0%   { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+                
+                button:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed !important;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
         extractButton.addEventListener('mouseenter', function() {
-            this.style.backgroundColor = '#e6b800';  // 鼠标悬停时高亮颜色
+            if (!this.disabled) {
+                this.style.backgroundColor = '#e6b800';  // 鼠标悬停时高亮颜色
+            }
         });
 
         extractButton.addEventListener('mouseleave', function() {
-            this.style.backgroundColor = '#f5c518';  // 鼠标移出时恢复颜色
+            if (!this.disabled) {
+                this.style.backgroundColor = '#f5c518';  // 鼠标移出时恢复颜色
+            }
         });
 
         extractButton.addEventListener('click', extractEpisodeInfo); // 鼠标点击时触发提取操作
@@ -59,60 +95,16 @@
 
 // 提取
 
-    // 添加创建加载动画的函数
-    function createLoadingSpinner() {
-        const spinner = document.createElement('div');
-        spinner.id = 'imdb-loading-spinner';
-        spinner.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 200px;
-            z-index: 10001;
-            width: 30px;
-            height: 30px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #f5c518;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        `;
-        
-        // 添加CSS动画
-        if (!document.getElementById('spinner-style')) {
-            const style = document.createElement('style');
-            style.id = 'spinner-style';
-            style.textContent = `
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-            `;
-            document.head.appendChild(style);
-        }
-        
-        document.body.appendChild(spinner);
-        return spinner;
-    }
-
-    // 移除加载动画
-    function removeLoadingSpinner() {
-        const spinner = document.getElementById('imdb-loading-spinner');
-        if (spinner) {
-            spinner.remove();
-        }
-    }
 
     // 修改提取剧集信息函数
     function extractEpisodeInfo() {
         console.log('开始提取剧集信息...');
         
-        // 显示加载动画
-        const spinner = createLoadingSpinner();
-        
-        // 禁用按钮并更改文本
+        // 禁用按钮并添加spinner动画
         extractButton.disabled = true;
-        extractButton.textContent = '提取中...';
+        const originalText = extractButton.innerHTML;
+        extractButton.innerHTML = `提取中..<span class="spinner"></span>`;
         extractButton.style.backgroundColor = '#ccc';
-        extractButton.style.cursor = 'not-allowed';
         
         setTimeout(() => {
             try {
@@ -184,12 +176,10 @@
                 console.error('提取剧集信息时发生错误:', error);
                 alert('提取过程中发生错误，请查看控制台了解详情。');
             } finally {
-                // 无论成功还是失败都要移除动画并恢复按钮
-                removeLoadingSpinner();
+                // 无论成功还是失败都要恢复按钮
+                extractButton.innerHTML = originalText;
                 extractButton.disabled = false;
-                extractButton.textContent = '提取剧集信息';
                 extractButton.style.backgroundColor = '#f5c518';
-                extractButton.style.cursor = 'pointer';
             }
         }, 2000);
     }
