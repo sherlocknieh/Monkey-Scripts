@@ -2,7 +2,7 @@
 // @namespace    http://tampermonkey.net/
 // @name         Porn GIF Tools
 // @grant        none
-// @version      1.3
+// @version      1.4
 // @match        https://*.pornhub.com/*
 // @match        https://www.sex.com/*
 // @description  Porn GIF Tools
@@ -70,57 +70,44 @@
     function initVolumeControl() {
         let retryCount = 0;
         
+        // 取消静音核心逻辑
         const unmute = () => {
-            let success = false;
+            const elements = [
+                ...SELECTORS.volumeButtons.map(id => document.getElementById(id)),
+                document.getElementById(SELECTORS.videoPlayer)
+            ].filter(Boolean);
             
-            // 处理音量按钮
-            SELECTORS.volumeButtons.forEach(id => {
-                const element = document.getElementById(id);
-                if (element?.classList.contains('muted')) {
-                    element.classList.remove('muted');
+            let success = false;
+            elements.forEach(el => {
+                if (el.classList?.contains('muted')) {
+                    el.classList.remove('muted');
+                    success = true;
+                } else if (el.tagName === 'VIDEO') {
+                    Object.assign(el, { muted: false, volume: 1 });
                     success = true;
                 }
             });
             
-            // 处理视频元素
-            const video = document.getElementById(SELECTORS.videoPlayer);
-            if (video) {
-                Object.assign(video, { muted: false, volume: 1 });
-                success = true;
-            }
-            
             return success;
         };
 
-        const tryUnmute = () => {
-            if (unmute() || retryCount >= LIMITS.maxRetries) return;
-            retryCount++;
-            utils.delay(tryUnmute, DELAYS.retry * retryCount);
-        };
-
-        // 立即尝试
-        tryUnmute();
+        // // 重试逻辑
+        // (function retry() {
+        //     if (unmute() || retryCount++ >= LIMITS.maxRetries) return;
+        //     utils.delay(retry, DELAYS.retry * retryCount);
+        // })(); // 立即执行
         
-        // 监听新元素
-        const targetElements = [...SELECTORS.volumeButtons, SELECTORS.videoPlayer];
-        utils.observe((mutations) => {
-            const hasTargetElement = mutations.some(m => 
-                Array.from(m.addedNodes).some(node => 
-                    utils.isTargetElement(node, targetElements)
-                )
-            );
-            if (hasTargetElement) utils.delay(unmute, DELAYS.observer);
+
+        // 监听目标元素添加 - 重点监听volumeButtons
+        const targets = [...SELECTORS.volumeButtons, SELECTORS.videoPlayer];
+        utils.observe(mutations => {
+            if (mutations.some(m => Array.from(m.addedNodes).some(n => utils.isTargetElement(n, targets)))) {
+                unmute(); // 发现目标元素立即执行，不延迟
+            }
         });
 
-        // 页面可见性变化
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) utils.delay(unmute, DELAYS.observer);
-        });
-        
-        // 页面完全加载
-        if (document.readyState !== 'complete') {
-            window.addEventListener('load', () => utils.delay(unmute, DELAYS.load));
-        }
+        // 页面可见性变化时尝试取消静音
+        document.addEventListener('visibilitychange', () => !document.hidden && utils.delay(unmute, DELAYS.observer));
     }
 
     // Sex.com功能
