@@ -151,22 +151,10 @@
                         if (isTrakt) {
                             episodeData = extractTraktEpisodeData(element, index);
                         } else {
-                            const episodeNumber = extractEpisodeNumber(element);
-                            const title = extractTitle(element);
-                            const rating = extractRating(element);
-                            const voteCount = extractVoteCount(element);
-                            const link = extractLink(element);
-                            
-                            episodeData = {
-                                episodeNumber: episodeNumber || `第${index + 1}集`,
-                                title: title || '未知标题',
-                                rating: rating || '未知评分',
-                                voteCount: voteCount || '未知',
-                                link: link || '未知链接'
-                            };
+                            episodeData = extractIMDBEpisodeData(element, index);
                         }
                         
-                        if (episodeData && (isTrakt || isValidEpisode(episodeData.title, episodeData.episodeNumber))) {
+                        if (episodeData && (isTrakt || isValidEpisode(episodeData.title))) {
                             episodes.push(episodeData);
                             
                             console.log(`剧集 ${episodeData.episodeNumber}:`);
@@ -310,229 +298,66 @@
         }
     }
 
-    // 验证是否为有效剧集的函数
-    function isValidEpisode(title, episodeNumber) {
+    // 简化的验证函数
+    function isValidEpisode(title) {
         if (!title || typeof title !== 'string') return false;
-
-        const titleLower = title.toLowerCase().trim();
-
-        // 排除的关键词
-        const excludeKeywords = [
-            'contribute to this page',
-            'more from this title',
-            'see all episodes',
-            'episode guide',
-            'season',
-            'series',
-            'show',
-            'cast',
-            'crew',
-            'imdb',
-            'rating',
-            'review',
-            'photo',
-            'video',
-            'news',
-            'trivia',
-            'goofs',
-            'quotes',
-            'connections',
-            'soundtracks',
-            'technical specs',
-            'browse episodes',
-            'add episode',
-            'edit page'
-        ];
-
-        // 检查是否包含排除关键词
-        if (excludeKeywords.some(keyword => titleLower.includes(keyword))) {
-            return false;
-        }
-
-        // 检查标题长度（太短的可能不是真正的剧集标题）
-        if (titleLower.length < 2) return false;
-
-        // 检查是否只包含特殊字符或数字
-        if (/^[\d\s\-\.\(\)]+$/.test(titleLower)) return false;
-
-        return true;
-    }
-
-    // 提取剧集编号
-    function extractEpisodeNumber(element) {
-        let episodeNumber = '';
-
-        // 从标题中提取剧集编号
-        const titleSelectors = [
-            'h4 a',
-            'h3 a',
-            '.titleColumn h4 a',
-            '[data-testid="episode-title"]',
-            '.episode-title',
-            '.cli-title a'
-        ];
-
-        for (const selector of titleSelectors) {
-            try {
-                const titleElement = element.querySelector(selector);
-                if (titleElement) {
-                    const titleText = titleElement.textContent?.trim() || '';
-                    const episodeMatch = titleText.match(/S(\d+)\.E(\d+)|Season\s+(\d+).*Episode\s+(\d+)|第(\d+)集|E(\d+)/i);
-                    if (episodeMatch) {
-                        if (episodeMatch[1] && episodeMatch[2]) {
-                            episodeNumber = `S${episodeMatch[1]}.E${episodeMatch[2]}`;
-                        } else if (episodeMatch[3] && episodeMatch[4]) {
-                            episodeNumber = `S${episodeMatch[3]}.E${episodeMatch[4]}`;
-                        } else if (episodeMatch[5]) {
-                            episodeNumber = `第${episodeMatch[5]}集`;
-                        } else if (episodeMatch[6]) {
-                            episodeNumber = `E${episodeMatch[6]}`;
-                        }
-                        break;
-                    }
-                }
-            } catch (error) {
-                console.warn(`剧集编号提取出错 (${selector}):`, error);
-            }
-        }
-
-        return episodeNumber;
-    }
-
-    // 提取标题
-    function extractTitle(element) {
-        let title = '';
-        const titleSelectors = [
-            'h4 a',
-            'h3 a',
-            '.titleColumn h4',
-            '.titleColumn h4 a',
-            '[data-testid="episode-title"]',
-            '.episode-title',
-            '.cli-title a'
-        ];
-
-        for (const selector of titleSelectors) {
-            try {
-                const titleElement = element.querySelector(selector);
-                if (titleElement) {
-                    title = titleElement.textContent?.trim() || '';
-                    if (title) {
-                        // 清理标题，移除剧集编号前缀
-                        title = title.replace(/^S\d+\.E\d+\s*[\-:]?\s*/i, '')
-                                    .replace(/^Season\s+\d+.*Episode\s+\d+\s*[\-:]?\s*/i, '')
-                                    .replace(/^第\d+集\s*[\-:]?\s*/i, '')
-                                    .replace(/^E\d+\s*[\-:]?\s*/i, '')
-                                    .trim();
-                        break;
-                    }
-                }
-            } catch (error) {
-                console.warn(`标题提取出错 (${selector}):`, error);
-            }
-        }
-
-        return title;
-    }
-
-    // 提取评分
-    function extractRating(element) {
-        let rating = '';
         
-        // 评分选择器
-        const ratingSelectors = [
-            '.ipc-rating-star--rating',
-            '.ratingColumn strong',
-            '[data-testid="episode-rating"]',
-            '.titleColumn .ipl-rating-star__rating',
-            '.cli-rating-with-count'
-        ];
-
-        for (const selector of ratingSelectors) {
-            const ratingElement = element.querySelector(selector);
-            if (ratingElement) {
-                rating = ratingElement.textContent.trim();
-                if (rating) break;
-            }
-        }
-
-        return rating;
+        const titleLower = title.toLowerCase().trim();
+        
+        // 简化的排除关键词
+        const excludeKeywords = ['contribute', 'see all', 'episode guide', 'imdb', 'browse episodes'];
+        
+        return titleLower.length > 2 && 
+               !excludeKeywords.some(keyword => titleLower.includes(keyword)) &&
+               !/^[\d\s\-\.\(\)]+$/.test(titleLower);
     }
 
-    // 提取打分人数
-    function extractVoteCount(element) {
-        let voteCount = '';
-        const voteSelectors = [
-            '.ipc-rating-star--voteCount',
-            '.ratingColumn span[title]',
-            '[data-testid="episode-vote-count"]',
-            '.titleColumn .ipl-rating-star__total-votes',
-            '.cli-rating-with-count .cli-vote-count'
-        ];
-
-        for (const selector of voteSelectors) {
-            const voteElement = element.querySelector(selector);
-            if (voteElement) {
-                let voteText = voteElement.textContent.trim();
-                // 提取数字，支持K、M等单位
-                const voteMatch = voteText.match(/([\d,]+(?:\.\d+)?[KM]?)/i);
-                if (voteMatch) {
-                    voteCount = voteMatch[1];
-                    break;
-                }
-                // 也尝试从title属性获取
-                const titleAttr = voteElement.getAttribute('title');
-                if (titleAttr) {
-                    const titleMatch = titleAttr.match(/([\d,]+)/);
-                    if (titleMatch) {
-                        voteCount = titleMatch[1];
-                        break;
-                    }
+    // 简化的IMDB数据提取函数
+    function extractIMDBEpisodeData(element, index) {
+        try {
+            // 基于实际HTML结构的简化选择器
+            const titleElement = element.querySelector('.ipc-title__text--reduced, h4 a, .titleColumn h4 a');
+            const ratingElement = element.querySelector('.ipc-rating-star--rating');
+            const voteElement = element.querySelector('.ipc-rating-star--voteCount');
+            const linkElement = element.querySelector('a[href*="/title/"], .ipc-title-link-wrapper, .ipc-lockup-overlay');
+            
+            // 提取数据
+            let title = titleElement?.textContent?.trim() || '';
+            let episodeNumber = '';
+            
+            // 从标题中提取剧集编号
+            const episodeMatch = title.match(/S(\d+)\.E(\d+)\s*∙\s*(.+)|(.+)/);
+            if (episodeMatch) {
+                if (episodeMatch[1] && episodeMatch[2]) {
+                    episodeNumber = `S${episodeMatch[1]}.E${episodeMatch[2]}`;
+                    title = episodeMatch[3] || '';
+                } else {
+                    title = episodeMatch[4] || title;
+                    episodeNumber = `第${index + 1}集`;
                 }
             }
-        }
-
-        // 如果在评分元素的父级或兄弟元素中查找打分人数
-        if (!voteCount) {
-            const ratingParent = element.querySelector('.ipc-rating-star, .ratingColumn, .cli-rating-with-count');
-            if (ratingParent) {
-                const voteText = ratingParent.textContent;
-                const voteMatch = voteText.match(/\(([\d,]+(?:\.\d+)?[KM]?)\s*votes?\)|([\d,]+(?:\.\d+)?[KM]?)\s*votes?/i);
-                if (voteMatch) {
-                    voteCount = voteMatch[1] || voteMatch[2];
-                }
+            
+            const rating = ratingElement?.textContent?.trim() || '未知评分';
+            const voteCount = voteElement?.textContent?.replace(/[()]/g, '').trim() || '未知';
+            
+            let link = linkElement?.href || '';
+            if (link.startsWith('/title/')) {
+                link = 'https://www.imdb.com' + link;
             }
+            link = link.split('?')[0]; // 移除查询参数
+            
+            return {
+                episodeNumber: episodeNumber || `第${index + 1}集`,
+                title: title || '未知标题',
+                rating,
+                voteCount,
+                link: link || '未知链接'
+            };
+            
+        } catch (error) {
+            console.error('提取IMDB剧集数据时出错:', error);
+            return null;
         }
-
-        return voteCount;
-    }
-
-    // 提取链接
-    function extractLink(element) {
-        let link = '';
-        const linkSelectors = [
-            'a[href^="/title/"]',  // 添加相对路径支持
-            '.ipc-title-link-wrapper',  // 添加新的选择器
-            '.ipc-lockup-overlay'  // 添加图片链接选择器
-        ];
-
-        for (const selector of linkSelectors) {
-            const linkElement = element.querySelector(selector);
-            if (linkElement) {
-                link = linkElement.href;
-                // 如果是相对路径，转换为完整URL
-                if (link.startsWith('/title/')) {
-                    link = 'https://www.imdb.com' + link;
-                }
-                // 去掉链接末尾的查询参数（如 ?ref_=ttep_ep_1 等）
-                if (link.includes('?')) {
-                    link = link.split('?')[0];
-                }
-                break;
-            }
-        }
-
-        return link;
     }
 
 //下载
@@ -613,80 +438,37 @@
         downloadButton = buttonContainer; // 保存引用以便后续移除
     }
 
+    // 简化的片名提取函数
+    function extractShowTitle() {
+        // 统一的选择器列表，按优先级排序
+        const selectors = [
+            'h1[data-testid="hero__pageTitle"] span',
+            'h1.titleBar-title',
+            'h1 .itemprop',
+            'h1',
+            '.titleBar-title',
+            '.hero__pageTitle'
+        ];
+        
+        for (const selector of selectors) {
+            const element = document.querySelector(selector);
+            if (element && element.textContent.trim()) {
+                return element.textContent.trim();
+            }
+        }
+        
+        // 从URL提取作为备选
+        const urlMatch = window.location.pathname.match(/\/title\/[^\/]+/);
+        return urlMatch ? `Show_${urlMatch[0].split('/')[2]}` : 'Unknown_Show';
+    }
+
     // 下载剧集数据
     function downloadEpisodeData(format = 'json') {
         try {
-            // 增强的片名提取逻辑
-            let showTitle = "剧集数据"; // 默认名称
-            
-            try {
-                // 检测是否为Trakt.tv页面
-                const isTrakt = window.location.hostname.includes('trakt.tv');
-                
-                if (isTrakt) {
-                    // Trakt.tv页面的片名提取
-                    const breadcrumbElements = document.querySelectorAll('.breadcrumb a');
-                    if (breadcrumbElements.length > 1) {
-                        showTitle = breadcrumbElements[1].textContent.trim();
-                    } else {
-                        // 备选方案：从页面标题提取
-                        const titleMatch = document.title.match(/^([^-]+)/);
-                        if (titleMatch) {
-                            showTitle = titleMatch[1].trim();
-                        }
-                    }
-                } else {
-                    // IMDb页面的原有逻辑
-                    // 优先使用subtitle选择器（最准确）
-                    const subtitleElement = document.querySelector('h2[data-testid="subtitle"]');
-                    if (subtitleElement && subtitleElement.textContent.trim()) {
-                        showTitle = subtitleElement.textContent.trim();
-                        console.log('从subtitle提取片名:', showTitle);
-                    } else {
-                        // 备选方案：从页面标题提取
-                        const titleSelectors = [
-                            'title',
-                            'h1[data-testid="hero__pageTitle"]',
-                            'h1.titleBar-title',
-                            '.title_wrapper h1',
-                            'h1',
-                            'meta[property="og:title"]'
-                        ];
-                        
-                        for (const selector of titleSelectors) {
-                            try {
-                                const element = document.querySelector(selector);
-                                if (element) {
-                                    let text = '';
-                                    if (selector === 'meta[property="og:title"]') {
-                                        text = element.getAttribute('content') || '';
-                                    } else {
-                                        text = element.textContent || element.innerText || '';
-                                    }
-                                    
-                                    if (text.trim()) {
-                                        // 清理标题文本
-                                        showTitle = text.trim()
-                                            .replace(/\s*\(TV Series.*?\).*$/i, '') // 移除 (TV Series 年份)
-                                            .replace(/\s*-\s*Episode list.*$/i, '') // 移除 - Episode list
-                                            .replace(/\s*-\s*IMDb.*$/i, '') // 移除 - IMDb
-                                            .replace(/\s*\|.*$/i, '') // 移除 | 后面的内容
-                                            .trim();
-                                        
-                                        if (showTitle && showTitle !== 'IMDb') {
-                                            console.log(`从${selector}提取片名:`, showTitle);
-                                            break;
-                                        }
-                                    }
-                                }
-                            } catch (e) {
-                                console.log(`选择器 ${selector} 提取失败:`, e);
-                            }
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('片名提取过程出错:', error);
+            // 简化的片名提取逻辑
+            let showTitle = extractShowTitle();
+            if (!showTitle || showTitle === 'Unknown_Show') {
+                showTitle = "剧集数据"; // 默认名称
             }
             
             // 清理文件名中的非法字符
