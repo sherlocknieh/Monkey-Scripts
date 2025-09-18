@@ -3,8 +3,9 @@
 // @name         剧集信息提取器
 // @grant        none
 // @version      2.0
-// @match        *://www.imdb.com/title/*/episodes*
+// @match        https://www.imdb.com/title/*/episodes*
 // @match        https://trakt.tv/shows/*/seasons/*
+// @exclude      https://trakt.tv/shows/*/seasons/*/episodes/*
 // @description  提取 IMDb, Trakt.tv 剧集页面的剧集信息
 // ==/UserScript==
 

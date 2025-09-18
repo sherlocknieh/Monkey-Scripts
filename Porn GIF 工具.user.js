@@ -2,7 +2,7 @@
 // @namespace    http://tampermonkey.net/
 // @name         Porn GIF Tools
 // @grant        none
-// @version      1.0
+// @version      1.3
 // @match        https://*.pornhub.com/*
 // @match        https://www.sex.com/*
 // @description  Porn GIF Tools
@@ -11,163 +11,172 @@
 (function() {
     'use strict';
 
-    // 主流程
-    (function main() {
-
-        const hostname = window.location.hostname;  // 获取当前域名
-        const url = window.location.href;           // 获取当前URL
-
-        // Pornhub 视频搜索自动跳转到GIF搜索
-        if (url.includes('pornhub.com/video/search')) {
-            const newUrl = url.replace('video', 'gif');
-            window.location.replace(newUrl);
-            return;
-        }
-        // Pornhub GIF页面取消静音
-        if (url.includes('pornhub.com/gif/')) {
-            waitForVolumeToggle();
-            return;
-        }
-        // SEX.com GIF页面处理
-        if (hostname === 'www.sex.com') {
-            // Webp转GIF, 添加搜图按钮
-            processMainImage();
-            // 监听DOM变化，处理动态加载的图片
-            const observer = new MutationObserver(mutations => {
-                mutations.forEach(mutation => {
-                    mutation.addedNodes.forEach(node => {
-                        if (node.nodeType === 1) {
-                            processMainImage();
-                        }
-                    });
-                });
-            });
-            observer.observe(document.body, {childList: true, subtree: true});
-            return;
-        }
-    })();
-
-
-    // 辅助函数
-
-    // 取消静音
-    function removeInitialMute() {
-        // 移除音量按钮的静音类
-        const volumeToggle = document.getElementById('js-volumeToggle');
-        if (volumeToggle && volumeToggle.classList.contains('muted')) {
-            volumeToggle.classList.remove('muted');
-        }
-        
-        // 移除模态框音量按钮的静音类
-        const volumeToggleModal = document.getElementById('js-volumeToggleModal');
-        if (volumeToggleModal && volumeToggleModal.classList.contains('muted')) {
-            volumeToggleModal.classList.remove('muted');
-        }
-        
-        // 设置视频元素不静音
-        const videoPlayer = document.getElementById('gifWebmPlayer');
-        if (videoPlayer) {
-            videoPlayer.muted = false;
-            videoPlayer.volume = 1;
-        }
-    }
+    const { hostname, href: url } = window.location;
     
-    // 等待js-volumeToggle元素出现后执行
-    function waitForVolumeToggle() {
-        const volumeToggle = document.getElementById('js-volumeToggle');
-        if (volumeToggle) {
-            removeInitialMute();
-        } else {
-            // 使用MutationObserver监听DOM变化
-            const observer = new MutationObserver(function(mutations) {
-                mutations.forEach(function(mutation) {
-                    if (mutation.type === 'childList') {
-                        const volumeToggle = document.getElementById('js-volumeToggle');
-                        if (volumeToggle) {
-                            observer.disconnect();
-                            removeInitialMute();
-                        }
-                    }
-                });
-            });
-            
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
-            
-            // 设置超时，避免无限等待
-            setTimeout(() => {
-                observer.disconnect();
-                removeInitialMute(); // 超时后仍然执行一次
-            }, 2000); // 2秒超时
-        }
+    // 常量定义
+    const SELECTORS = {
+        volumeButtons: ['js-volumeToggle', 'js-volumeToggleModal'],
+        videoPlayer: 'gifWebmPlayer',
+        sexComImage: 'img[data-testid="pin-carousel-image"]',
+        searchButton: '.search-button'
+    };
+    
+    const DELAYS = { initial: 100, retry: 200, observer: 100, load: 200 };
+    const LIMITS = { maxRetries: 10, observerTimeout: 5000 };
 
-        // 页面变为可见时再尝试取消静音
-        document.addEventListener('visibilitychange', function() {
-            if (!document.hidden) {
-                removeInitialMute();
+    // 工具函数
+    const utils = {
+        // 延迟执行
+        delay: (fn, ms) => setTimeout(fn, ms),
+        
+        // DOM就绪检查
+        whenReady: (callback) => {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', callback);
+            } else {
+                utils.delay(callback, DELAYS.initial);
             }
+        },
+        
+        // 创建DOM观察器
+        observe: (callback, timeout = LIMITS.observerTimeout) => {
+            const observer = new MutationObserver(callback);
+            observer.observe(document.body, { childList: true, subtree: true });
+            if (timeout > 0) utils.delay(() => observer.disconnect(), timeout);
+            return observer;
+        },
+        
+        // 检查元素是否为目标元素
+        isTargetElement: (node, targets) => {
+            if (node.nodeType !== 1) return false;
+            return targets.some(target => 
+                node.id === target || node.querySelector(`#${target}`)
+            );
+        }
+    };
+
+    // 主流程
+    function main() {
+        if (url.includes('pornhub.com/video/search')) {
+            window.location.replace(url.replace('video', 'gif'));
+        } else if (url.includes('pornhub.com/gif/')) {
+            utils.whenReady(initVolumeControl);
+        } else if (hostname === 'www.sex.com') {
+            initSexComFeatures();
+        }
+    }
+
+    // Pornhub音量控制
+    function initVolumeControl() {
+        let retryCount = 0;
+        
+        const unmute = () => {
+            let success = false;
+            
+            // 处理音量按钮
+            SELECTORS.volumeButtons.forEach(id => {
+                const element = document.getElementById(id);
+                if (element?.classList.contains('muted')) {
+                    element.classList.remove('muted');
+                    success = true;
+                }
+            });
+            
+            // 处理视频元素
+            const video = document.getElementById(SELECTORS.videoPlayer);
+            if (video) {
+                Object.assign(video, { muted: false, volume: 1 });
+                success = true;
+            }
+            
+            return success;
+        };
+
+        const tryUnmute = () => {
+            if (unmute() || retryCount >= LIMITS.maxRetries) return;
+            retryCount++;
+            utils.delay(tryUnmute, DELAYS.retry * retryCount);
+        };
+
+        // 立即尝试
+        tryUnmute();
+        
+        // 监听新元素
+        const targetElements = [...SELECTORS.volumeButtons, SELECTORS.videoPlayer];
+        utils.observe((mutations) => {
+            const hasTargetElement = mutations.some(m => 
+                Array.from(m.addedNodes).some(node => 
+                    utils.isTargetElement(node, targetElements)
+                )
+            );
+            if (hasTargetElement) utils.delay(unmute, DELAYS.observer);
         });
+
+        // 页面可见性变化
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) utils.delay(unmute, DELAYS.observer);
+        });
+        
+        // 页面完全加载
+        if (document.readyState !== 'complete') {
+            window.addEventListener('load', () => utils.delay(unmute, DELAYS.load));
+        }
     }
 
-    // 主图处理函数
-    function processMainImage() {
-        const mainImage = document.querySelector('img[data-testid="pin-carousel-image"]');
-        if (mainImage) {
-            const src = mainImage.src;
-            if (src.includes('.webp')) {
-                mainImage.src = src.replace('.webp', '.gif');
+    // Sex.com功能
+    function initSexComFeatures() {
+        const processImage = () => {
+            const img = document.querySelector(SELECTORS.sexComImage);
+            if (!img) return;
+            
+            // Webp转GIF
+            if (img.src.includes('.webp')) {
+                img.src = img.src.replace('.webp', '.gif');
             }
-        }
-        addSearchButton(mainImage);
+            
+            addSearchButton(img);
+        };
+
+        processImage();
+        utils.observe((mutations) => {
+            if (mutations.some(m => m.addedNodes.length > 0)) processImage();
+        }, 0);
     }
 
-    // 搜图按钮创建函数
+    // 添加搜图按钮
     function addSearchButton(img) {
-        // 检查是否已经添加过按钮
-        if (img.parentElement.querySelector('.search-button')) {
-            return;
+        const parent = img.parentElement;
+        if (!parent || parent.querySelector(SELECTORS.searchButton)) return;
+        
+        const button = Object.assign(document.createElement('button'), {
+            className: 'search-button',
+            textContent: 'NameThatPorn'
+        });
+        
+        // 样式设置
+        Object.assign(button.style, {
+            position: 'absolute', top: '5px', right: '5px',
+            padding: '5px 10px', background: 'rgba(0,0,0,0.7)',
+            color: 'white', border: 'none', borderRadius: '5px',
+            cursor: 'pointer', zIndex: '1000', fontSize: '12px'
+        });
+        
+        // 确保父元素定位
+        if (getComputedStyle(parent).position === 'static') {
+            parent.style.position = 'relative';
         }
         
-        // 创建搜图按钮
-        const searchButton = document.createElement('button');
-        searchButton.className = 'search-button';
-        searchButton.innerHTML = 'NameThatPorn';
-        searchButton.style.cssText = `
-            position: absolute;  /* 定位: 相对于父元素 */
-            top: 5px;            /* 距离顶部 5px */
-            right: 5px;          /* 距离右侧 5px */
-            padding: 5px 10px;   /* 内边距 */
-            background: rgba(0, 0, 0, 0.7); /* 背景颜色: 半透明黑色 */
-            border-radius: 5px;  /* 圆角 */
-            cursor: pointer;     /* 鼠标悬停样式 */
-            z-index: 1000;       /* 确保按钮在图片上层 */
-        `;
-        
-        // 确保父元素有相对定位
-        if (getComputedStyle(img.parentElement).position === 'static') {
-            img.parentElement.style.position = 'relative';
-        }
-        
-        // 添加按钮到图片的父元素
-        img.parentElement.appendChild(searchButton);
-
-        // 注册按钮点击事件
-        searchButton.addEventListener('click', (e) => {
+        // 点击事件
+        button.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            
-            let searchUrl = img.src;
-            // 如果是gif，替换为webp用于搜索
-            if (searchUrl.includes('.gif')) {
-                searchUrl = searchUrl.replace('.gif', '.webp');
-            }
-            
-            const searchLink = `https://namethatporn.com/search/images.html?url=${encodeURIComponent(searchUrl)}`;
-            window.open(searchLink, '_blank');
-        });
+            const searchUrl = img.src.replace('.gif', '.webp');
+            window.open(`https://namethatporn.com/search/images.html?url=${encodeURIComponent(searchUrl)}`, '_blank');
+        };
         
+        parent.appendChild(button);
     }
 
+    // 启动
+    main();
 })();
