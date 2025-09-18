@@ -3,6 +3,6 @@
 
 点击安装:
 
-- [TV剧集信息提取器](https://github.com/sherlocknieh/MonkeyScripts/raw/main/TV评分提取.js)
+- [TV剧集信息提取器](https://github.com/sherlocknieh/MonkeyScripts/raw/main/TV评分提取.user.js)
 
-- [ Porn GIF 工具](https://github.com/sherlocknieh/MonkeyScripts/raw/main/Porn%20GIF%20工具.js)
+- [ Porn GIF 工具](https://github.com/sherlocknieh/MonkeyScripts/raw/main/Porn%20GIF%20工具.user.js)
