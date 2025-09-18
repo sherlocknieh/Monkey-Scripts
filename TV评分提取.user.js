@@ -9,126 +9,254 @@
 // ==/UserScript==
 
 (function() {
-    'use strict'; // 启用现代JS语法标准
+    'use strict';
 
-    let episodes = [];  // 存储剧集信息的数组
-    let extractButton = null;   // 提取按钮存在标志
-    let downloadButton = null;  // 下载按钮存在标志
+    let episodes = [];
+    let extractButton = null;
+    let downloadButton = null;
 
-// 初始化按钮
-
-    // 页面加载完成后添加提取按钮
-    window.addEventListener('load', addExtractButton);
-
-    // 添加提取按钮
-    function addExtractButton() {
-
-        if (extractButton) return;        // 避免重复创建按钮
-
-        extractButton = document.createElement('button');  // 创建按钮
-        extractButton.textContent = '提取剧集信息';        // 添加文本
-        extractButton.style.cssText =                      // 设置样式
+    // 公共样式配置
+    const STYLES = {
+        button: {
+            base: `
+                position: fixed;
+                z-index: 10000;
+                padding: 10px 20px;
+                border: none;
+                border-radius: 5px;
+                font-size: 14px;
+                font-weight: bold;
+                cursor: pointer;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            `,
+            extract: `
+                bottom: 20px;
+                right: 20px;
+                background-color: #f5c518;
+                color: #000;
+                display: inline-flex;
+                align-items: center;
+            `,
+            download: `
+                background-color: #4CAF50;
+                color: white;
+            `,
+            tsv: `
+                background-color: #2196F3;
+                color: white;
+            `
+        },
+        spinner: `
+            .spinner {
+                width: 1em; height: 1em; 
+                border: 2px solid rgba(0,0,0,0.3);
+                border-top: 2px solid #000;
+                border-radius: 50%;
+                display: inline-block;
+                vertical-align: baseline;
+                margin-right: 6px;
+                animation: spin 0.8s linear infinite;
+            }
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            button:disabled {
+                opacity: 0.6;
+                cursor: not-allowed !important;
+            }
         `
-            position: fixed;                /* 位置基于浏览器窗口 */
-            top: 20px;                      /* 距离顶部 20px */
-            right: 20px;                    /* 距离右侧 20px */
-            z-index: 10000;                 /* 确保按钮在其他元素之上 */
-            padding: 10px 20px;             /* 内边距: 10px 20px */
-            background-color: #f5c518;      /* 背景颜色: 黄色 */
-            color: #000;                    /* 文字颜色: 黑色 */
-            border: none;                   /* 无边框 */
-            border-radius: 5px;             /* 圆角: 5px */
-            font-size: 14px;                /* 字体大小: 14px */
-            font-weight: bold;              /* 字体加粗 */
-            cursor: pointer;                /* 鼠标悬停时显示为指针 */
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);  /* 阴影 */
-            display: inline-flex;           /* 使用 Flexbox 布局 */
-            align-items: center;            /* 侧轴对齐: 居中 */
-        `;
+    };
 
-        // 添加spinner样式到页面
-        if (!document.getElementById('spinner-style')) {
+    // 创建样式表
+    function addStyles() {
+        if (!document.getElementById('episode-extractor-styles')) {
             const style = document.createElement('style');
-            style.id = 'spinner-style';
-            style.textContent = `
-                .spinner {
-                    width: 1em; 
-                    height: 1em; 
-                    border: 2px solid rgba(0,0,0,0.3);
-                    border-top: 2px solid #000;
-                    border-radius: 50%;
-                    display: inline-block;
-                    vertical-align: baseline;
-                    margin-right: 6px;
-                    animation: spin 0.8s linear infinite;
-                }
-                
-                @keyframes spin {
-                    0%   { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-                
-                button:disabled {
-                    opacity: 0.6;
-                    cursor: not-allowed !important;
-                }
-            `;
+            style.id = 'episode-extractor-styles';
+            style.textContent = STYLES.spinner;
             document.head.appendChild(style);
         }
-
-        extractButton.addEventListener('mouseenter', function() {
-            if (!this.disabled) {
-                this.style.backgroundColor = '#e6b800';  // 鼠标悬停时高亮颜色
-            }
-        });
-
-        extractButton.addEventListener('mouseleave', function() {
-            if (!this.disabled) {
-                this.style.backgroundColor = '#f5c518';  // 鼠标移出时恢复颜色
-            }
-        });
-
-        extractButton.addEventListener('click', extractEpisodeInfo); // 鼠标点击时触发提取操作
-
-        document.body.appendChild(extractButton);    // 添加按钮到 body 中
     }
 
-// 提取
+    // 创建按钮的通用函数
+    function createButton(text, styles, onClick) {
+        const button = document.createElement('button');
+        button.textContent = text;
+        button.style.cssText = STYLES.button.base + styles;
+        button.addEventListener('click', onClick);
+        
+        // 添加悬停效果
+        const originalBg = button.style.backgroundColor;
+        const hoverBg = originalBg === '#f5c518' ? '#e6b800' : 
+                       originalBg === '#4CAF50' ? '#45a049' : '#1976D2';
+        
+        button.addEventListener('mouseenter', () => {
+            if (!button.disabled) button.style.backgroundColor = hoverBg;
+        });
+        button.addEventListener('mouseleave', () => {
+            if (!button.disabled) button.style.backgroundColor = originalBg;
+        });
+        
+        return button;
+    }
 
+    // 工具函数
+    const utils = {
+        formatNumber: (num) => {
+            const n = parseInt(num) || 0;
+            return n >= 1000000 ? (n / 1000000).toFixed(1) + 'M' :
+                   n >= 1000 ? (n / 1000).toFixed(1) + 'k' : n.toString();
+        },
+        
+        isValidEpisode: (title) => {
+            if (!title || typeof title !== 'string') return false;
+            const titleLower = title.toLowerCase().trim();
+            const excludeKeywords = ['contribute', 'see all', 'episode guide', 'imdb', 'browse episodes'];
+            return titleLower.length > 2 && 
+                   !excludeKeywords.some(keyword => titleLower.includes(keyword)) &&
+                   !/^[\d\s\-\.\(\)]+$/.test(titleLower);
+        },
+        
+        extractShowTitle: () => {
+            const selectors = [
+                'h1[data-testid="hero__pageTitle"] span',
+                'h1.titleBar-title', 'h1 .itemprop', 'h1',
+                '.titleBar-title', '.hero__pageTitle'
+            ];
+            
+            for (const selector of selectors) {
+                const element = document.querySelector(selector);
+                if (element?.textContent?.trim()) {
+                    return element.textContent.trim();
+                }
+            }
+            
+            const urlMatch = window.location.pathname.match(/\/title\/[^\/]+/);
+            return urlMatch ? `Show_${urlMatch[0].split('/')[2]}` : '剧集数据';
+        }
+    };
 
-    // 修改提取剧集信息函数
+    // 数据提取器
+    const extractors = {
+        trakt: (element, index) => {
+            try {
+                const episodeNumber = element.getAttribute('data-number') || (index + 1);
+                const seasonNumber = element.getAttribute('data-season-number') || '0';
+                const percentage = element.getAttribute('data-percentage') || '0';
+                const votes = element.getAttribute('data-votes') || '0';
+                
+                const title = element.querySelector('.main-title, .titles-link h3 .main-title')?.textContent?.trim() || '未知标题';
+                
+                const episodeNumberStr = seasonNumber === '0' ? 
+                    `Special ${episodeNumber}` : 
+                    `S${seasonNumber}E${episodeNumber.toString().padStart(2, '0')}`;
+                
+                let link = element.querySelector('a[href*="/shows/"]')?.href || '';
+                if (link.startsWith('/')) link = 'https://trakt.tv' + link;
+                
+                const dateElement = element.querySelector('.convert-date');
+                const airDate = dateElement ? new Date(dateElement.getAttribute('data-date')).toLocaleDateString('zh-CN') : '未知日期';
+                
+                let runtime = element.querySelector('.humanized-minutes')?.textContent?.trim() || '';
+                if (!runtime) {
+                    const runtimeData = element.getAttribute('data-runtime');
+                    if (runtimeData) {
+                        const minutes = parseInt(runtimeData);
+                        runtime = minutes >= 60 ? 
+                            `${Math.floor(minutes / 60)}h ${minutes % 60}m` : 
+                            `${minutes}m`;
+                    }
+                }
+                
+                return {
+                    episodeNumber: episodeNumberStr,
+                    title,
+                    rating: `${percentage}%`,
+                    voteCount: `${utils.formatNumber(votes)} votes`,
+                    link: link || '未知链接',
+                    airDate,
+                    runtime: runtime || '未知时长',
+                    watchers: utils.formatNumber(element.getAttribute('data-watchers')),
+                    plays: utils.formatNumber(element.getAttribute('data-plays')),
+                    collected: utils.formatNumber(element.getAttribute('data-collected')),
+                    lists: utils.formatNumber(element.getAttribute('data-lists'))
+                };
+            } catch (error) {
+                console.error('提取Trakt.tv数据出错:', error);
+                return null;
+            }
+        },
+        
+        imdb: (element, index) => {
+            try {
+                const titleElement = element.querySelector('.ipc-title__text--reduced, h4 a, .titleColumn h4 a');
+                const ratingElement = element.querySelector('.ipc-rating-star--rating');
+                const voteElement = element.querySelector('.ipc-rating-star--voteCount');
+                const linkElement = element.querySelector('a[href*="/title/"], .ipc-title-link-wrapper, .ipc-lockup-overlay');
+                
+                let title = titleElement?.textContent?.trim() || '';
+                let episodeNumber = '';
+                
+                const episodeMatch = title.match(/S(\d+)\.E(\d+)\s*∙\s*(.+)|(.+)/);
+                if (episodeMatch) {
+                    if (episodeMatch[1] && episodeMatch[2]) {
+                        episodeNumber = `S${episodeMatch[1]}.E${episodeMatch[2]}`;
+                        title = episodeMatch[3] || '';
+                    } else {
+                        title = episodeMatch[4] || title;
+                        episodeNumber = `第${index + 1}集`;
+                    }
+                }
+                
+                let link = linkElement?.href || '';
+                if (link.startsWith('/title/')) link = 'https://www.imdb.com' + link;
+                link = link.split('?')[0];
+                
+                return {
+                    episodeNumber: episodeNumber || `第${index + 1}集`,
+                    title: title || '未知标题',
+                    rating: ratingElement?.textContent?.trim() || '未知评分',
+                    voteCount: voteElement?.textContent?.replace(/[()]/g, '').trim() || '未知',
+                    link: link || '未知链接'
+                };
+            } catch (error) {
+                console.error('提取IMDB数据出错:', error);
+                return null;
+            }
+        }
+    };
+
+    // 主要功能函数
+    function addExtractButton() {
+        if (extractButton) return;
+        
+        addStyles();
+        extractButton = createButton('提取剧集信息', STYLES.button.extract, extractEpisodeInfo);
+        document.body.appendChild(extractButton);
+    }
+
     function extractEpisodeInfo() {
         console.log('开始提取剧集信息...');
         
-        // 禁用按钮并添加spinner动画
         extractButton.disabled = true;
         const originalText = extractButton.innerHTML;
-        extractButton.innerHTML = `提取中..<span class="spinner"></span>`;
+        extractButton.innerHTML = '提取中..<span class="spinner"></span>';
         extractButton.style.backgroundColor = '#ccc';
         
         setTimeout(() => {
             try {
                 episodes = [];
-                
-                // 检测是否为Trakt.tv页面
                 const isTrakt = window.location.hostname.includes('trakt.tv');
                 
                 let episodeElements = [];
-                
                 if (isTrakt) {
-                    console.log('检测到Trakt.tv页面，使用专用选择器...');
                     episodeElements = document.querySelectorAll('.row.fanarts.sortable');
                 } else {
-                    // IMDb页面的原有逻辑
                     episodeElements = document.querySelectorAll('[data-testid="episodes-browse-episode"]');
-                    
                     if (episodeElements.length === 0) {
-                        console.log('未找到主要选择器，尝试备用选择器...');
                         episodeElements = document.querySelectorAll('.episode-item-wrapper, .titleColumn, .cli-episode-item, .episode, .episode-card, .episode-list-item');
                     }
-                    
                     if (episodeElements.length === 0) {
-                        console.log('未找到剧集元素，尝试更广泛的搜索...');
                         const allElements = document.querySelectorAll('div, article, section, li');
                         episodeElements = Array.from(allElements).filter(el => {
                             const text = el.textContent || '';
@@ -137,32 +265,19 @@
                     }
                 }
                 
-                console.log(`找到 ${episodeElements.length} 个潜在的剧集元素`);
-                
                 if (episodeElements.length === 0) {
-                    alert('未找到剧集信息。可能原因：\n1. 页面内容尚未完全加载\n2. 页面结构已更改\n3. 需要登录或特殊权限\n\n请刷新页面后重试，或在剧集列表完全显示后再点击提取按钮。');
+                    alert('未找到剧集信息。请刷新页面后重试，或在剧集列表完全显示后再点击提取按钮。');
                     return;
                 }
                 
                 episodeElements.forEach((element, index) => {
                     try {
-                        let episodeData;
+                        const episodeData = isTrakt ? 
+                            extractors.trakt(element, index) : 
+                            extractors.imdb(element, index);
                         
-                        if (isTrakt) {
-                            episodeData = extractTraktEpisodeData(element, index);
-                        } else {
-                            episodeData = extractIMDBEpisodeData(element, index);
-                        }
-                        
-                        if (episodeData && (isTrakt || isValidEpisode(episodeData.title))) {
+                        if (episodeData && (isTrakt || utils.isValidEpisode(episodeData.title))) {
                             episodes.push(episodeData);
-                            
-                            console.log(`剧集 ${episodeData.episodeNumber}:`);
-                            console.log(`标题: ${episodeData.title}`);
-                            console.log(`评分: ${episodeData.rating}`);
-                            console.log(`打分人数: ${episodeData.voteCount}`);
-                            console.log(`链接: ${episodeData.link}`);
-                            console.log('---');
                         }
                     } catch (error) {
                         console.error(`处理第 ${index + 1} 个剧集元素时出错:`, error);
@@ -172,7 +287,7 @@
                 if (episodes.length > 0) {
                     console.log(`成功提取 ${episodes.length} 个剧集信息`);
                     createDownloadButton();
-                    downloadEpisodeData('csv'); // 自动下载CSV文件
+                    downloadEpisodeData('csv');
                 } else {
                     alert('未能提取到有效的剧集信息。请检查页面是否正确加载了剧集列表。');
                 }
@@ -181,7 +296,6 @@
                 console.error('提取剧集信息时发生错误:', error);
                 alert('提取过程中发生错误，请查看控制台了解详情。');
             } finally {
-                // 无论成功还是失败都要恢复按钮
                 extractButton.innerHTML = originalText;
                 extractButton.disabled = false;
                 extractButton.style.backgroundColor = '#f5c518';
@@ -189,398 +303,87 @@
         }, 2000);
     }
 
-    // 提取Trakt.tv剧集数据
-    function extractTraktEpisodeData(element, index) {
-        try {
-            // 从data属性中提取基本信息
-            const episodeNumber = element.getAttribute('data-number') || (index + 1);
-            const seasonNumber = element.getAttribute('data-season-number') || '0';
-            const percentage = element.getAttribute('data-percentage') || '0';
-            const watchers = element.getAttribute('data-watchers') || '0';
-            const plays = element.getAttribute('data-plays') || '0';
-            const collected = element.getAttribute('data-collected') || '0';
-            const lists = element.getAttribute('data-lists') || '0';
-            const votes = element.getAttribute('data-votes') || '0';
-            
-            // 提取剧集标题
-            let title = '';
-            const titleElement = element.querySelector('.main-title');
-            if (titleElement) {
-                title = titleElement.textContent.trim();
-            }
-            
-            // 如果没有找到标题，尝试从其他地方提取
-            if (!title) {
-                const titleLinkElement = element.querySelector('.titles-link h3 .main-title');
-                if (titleLinkElement) {
-                    title = titleLinkElement.textContent.trim();
-                }
-            }
-            
-            // 构建剧集编号字符串
-            let episodeNumberStr = '';
-            if (seasonNumber === '0') {
-                episodeNumberStr = `Special ${episodeNumber}`;
-            } else {
-                episodeNumberStr = `S${seasonNumber}E${episodeNumber.toString().padStart(2, '0')}`;
-            }
-            
-            // 提取链接
-            let link = '';
-            const linkElement = element.querySelector('a[href*="/shows/"]');
-            if (linkElement) {
-                link = linkElement.href;
-                if (link.startsWith('/')) {
-                    link = 'https://trakt.tv' + link;
-                }
-            }
-            
-            // 提取播出日期
-            let airDate = '';
-            const dateElement = element.querySelector('.convert-date');
-            if (dateElement) {
-                const dateAttr = dateElement.getAttribute('data-date');
-                if (dateAttr) {
-                    const date = new Date(dateAttr);
-                    airDate = date.toLocaleDateString('zh-CN');
-                }
-            }
-            
-            // 提取时长
-            let runtime = '';
-            const runtimeElement = element.querySelector('.humanized-minutes');
-            if (runtimeElement) {
-                runtime = runtimeElement.textContent.trim();
-            } else {
-                // 从data属性获取时长
-                const runtimeData = element.getAttribute('data-runtime');
-                if (runtimeData) {
-                    const minutes = parseInt(runtimeData);
-                    if (minutes >= 60) {
-                        const hours = Math.floor(minutes / 60);
-                        const remainingMinutes = minutes % 60;
-                        runtime = `${hours}h ${remainingMinutes}m`;
-                    } else {
-                        runtime = `${minutes}m`;
-                    }
-                }
-            }
-            
-            // 格式化数据
-            const formatNumber = (num) => {
-                const n = parseInt(num) || 0;
-                if (n >= 1000000) {
-                    return (n / 1000000).toFixed(1) + 'M';
-                } else if (n >= 1000) {
-                    return (n / 1000).toFixed(1) + 'k';
-                } else {
-                    return n.toString();
-                }
-            };
-            
-            return {
-                episodeNumber: episodeNumberStr,
-                title: title || '未知标题',
-                rating: `${percentage}%`,
-                voteCount: `${formatNumber(votes)} votes`,
-                link: link || '未知链接',
-                airDate: airDate || '未知日期',
-                runtime: runtime || '未知时长',
-                watchers: formatNumber(watchers),
-                plays: formatNumber(plays),
-                collected: formatNumber(collected),
-                lists: formatNumber(lists)
-            };
-            
-        } catch (error) {
-            console.error('提取Trakt.tv剧集数据时出错:', error);
-            return null;
-        }
-    }
-
-    // 简化的验证函数
-    function isValidEpisode(title) {
-        if (!title || typeof title !== 'string') return false;
-        
-        const titleLower = title.toLowerCase().trim();
-        
-        // 简化的排除关键词
-        const excludeKeywords = ['contribute', 'see all', 'episode guide', 'imdb', 'browse episodes'];
-        
-        return titleLower.length > 2 && 
-               !excludeKeywords.some(keyword => titleLower.includes(keyword)) &&
-               !/^[\d\s\-\.\(\)]+$/.test(titleLower);
-    }
-
-    // 简化的IMDB数据提取函数
-    function extractIMDBEpisodeData(element, index) {
-        try {
-            // 基于实际HTML结构的简化选择器
-            const titleElement = element.querySelector('.ipc-title__text--reduced, h4 a, .titleColumn h4 a');
-            const ratingElement = element.querySelector('.ipc-rating-star--rating');
-            const voteElement = element.querySelector('.ipc-rating-star--voteCount');
-            const linkElement = element.querySelector('a[href*="/title/"], .ipc-title-link-wrapper, .ipc-lockup-overlay');
-            
-            // 提取数据
-            let title = titleElement?.textContent?.trim() || '';
-            let episodeNumber = '';
-            
-            // 从标题中提取剧集编号
-            const episodeMatch = title.match(/S(\d+)\.E(\d+)\s*∙\s*(.+)|(.+)/);
-            if (episodeMatch) {
-                if (episodeMatch[1] && episodeMatch[2]) {
-                    episodeNumber = `S${episodeMatch[1]}.E${episodeMatch[2]}`;
-                    title = episodeMatch[3] || '';
-                } else {
-                    title = episodeMatch[4] || title;
-                    episodeNumber = `第${index + 1}集`;
-                }
-            }
-            
-            const rating = ratingElement?.textContent?.trim() || '未知评分';
-            const voteCount = voteElement?.textContent?.replace(/[()]/g, '').trim() || '未知';
-            
-            let link = linkElement?.href || '';
-            if (link.startsWith('/title/')) {
-                link = 'https://www.imdb.com' + link;
-            }
-            link = link.split('?')[0]; // 移除查询参数
-            
-            return {
-                episodeNumber: episodeNumber || `第${index + 1}集`,
-                title: title || '未知标题',
-                rating,
-                voteCount,
-                link: link || '未知链接'
-            };
-            
-        } catch (error) {
-            console.error('提取IMDB剧集数据时出错:', error);
-            return null;
-        }
-    }
-
-//下载
-
-    // 创建下载按钮
     function createDownloadButton() {
-        // 避免重复创建下载按钮
-        if (downloadButton) {
-            downloadButton.remove();
-        }
+        if (downloadButton) downloadButton.remove();
 
-        // 创建下载按钮容器
         const buttonContainer = document.createElement('div');
         buttonContainer.style.cssText = `
-            position: fixed;
-            top: 70px;
-            right: 20px;
-            z-index: 10000;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
+            position: fixed; top: 70px; right: 20px; z-index: 10000;
+            display: flex; flex-direction: column; gap: 5px;
         `;
 
-        // JSON下载按钮
-        const jsonButton = document.createElement('button');
-        jsonButton.textContent = `下载JSON (${episodes.length}条)`;
-        jsonButton.style.cssText = `
-            padding: 10px 20px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        `;
-
-        jsonButton.addEventListener('mouseenter', function() {
-            this.style.backgroundColor = '#45a049';
-        });
-
-        jsonButton.addEventListener('mouseleave', function() {
-            this.style.backgroundColor = '#4CAF50';
-        });
-
-        jsonButton.addEventListener('click', () => downloadEpisodeData('json'));
-
-        // TSV下载按钮
-        const tsvButton = document.createElement('button');
-        tsvButton.textContent = `下载TSV (${episodes.length}条)`;
-        tsvButton.style.cssText = `
-            padding: 10px 20px;
-            background-color: #2196F3;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        `;
-
-        tsvButton.addEventListener('mouseenter', function() {
-            this.style.backgroundColor = '#1976D2';
-        });
-
-        tsvButton.addEventListener('mouseleave', function() {
-            this.style.backgroundColor = '#2196F3';
-        });
-
-        tsvButton.addEventListener('click', () => downloadEpisodeData('csv'));
+        const jsonButton = createButton(`下载JSON (${episodes.length}条)`, STYLES.button.download, () => downloadEpisodeData('json'));
+        const tsvButton = createButton(`下载TSV (${episodes.length}条)`, STYLES.button.tsv, () => downloadEpisodeData('csv'));
 
         buttonContainer.appendChild(jsonButton);
         buttonContainer.appendChild(tsvButton);
         document.body.appendChild(buttonContainer);
         
-        downloadButton = buttonContainer; // 保存引用以便后续移除
+        downloadButton = buttonContainer;
     }
 
-    // 简化的片名提取函数
-    function extractShowTitle() {
-        // 统一的选择器列表，按优先级排序
-        const selectors = [
-            'h1[data-testid="hero__pageTitle"] span',
-            'h1.titleBar-title',
-            'h1 .itemprop',
-            'h1',
-            '.titleBar-title',
-            '.hero__pageTitle'
-        ];
-        
-        for (const selector of selectors) {
-            const element = document.querySelector(selector);
-            if (element && element.textContent.trim()) {
-                return element.textContent.trim();
-            }
-        }
-        
-        // 从URL提取作为备选
-        const urlMatch = window.location.pathname.match(/\/title\/[^\/]+/);
-        return urlMatch ? `Show_${urlMatch[0].split('/')[2]}` : 'Unknown_Show';
-    }
-
-    // 下载剧集数据
     function downloadEpisodeData(format = 'json') {
         try {
-            // 简化的片名提取逻辑
-            let showTitle = extractShowTitle();
-            if (!showTitle || showTitle === 'Unknown_Show') {
-                showTitle = "剧集数据"; // 默认名称
-            }
-            
-            // 清理文件名中的非法字符
+            const showTitle = utils.extractShowTitle();
             const cleanTitle = showTitle.replace(/[<>:"/\\|?*]/g, '_');
             
-            let seasonInfo = '';
-            let episodeRange = '';
+            let seasonInfo = 'S1', episodeRange = 'E1';
             
             if (episodes.length > 0) {
-                // 从第一个和最后一个剧集中提取季数信息
                 const firstEpisode = episodes[0].episodeNumber;
                 const lastEpisode = episodes[episodes.length - 1].episodeNumber;
                 
-                // 提取季数
                 const seasonMatch = firstEpisode.match(/S(\d+)/i);
-                if (seasonMatch) {
-                    seasonInfo = `S${seasonMatch[1]}`;
-                } else if (firstEpisode.includes('Special')) {
-                    seasonInfo = 'Specials';
-                } else {
-                    seasonInfo = 'S1'; // 默认第一季
-                }
+                seasonInfo = seasonMatch ? `S${seasonMatch[1]}` : 
+                           firstEpisode.includes('Special') ? 'Specials' : 'S1';
                 
-                // 确定集数范围
                 const firstEpMatch = firstEpisode.match(/E(\d+)/i);
                 const lastEpMatch = lastEpisode.match(/E(\d+)/i);
                 
                 if (firstEpMatch && lastEpMatch) {
                     const firstEpNum = firstEpMatch[1];
                     const lastEpNum = lastEpMatch[1];
-                    
-                    if (firstEpNum === lastEpNum) {
-                        episodeRange = `E${firstEpNum}`;
-                    } else {
-                        episodeRange = `E${firstEpNum}-E${lastEpNum}`;
-                    }
+                    episodeRange = firstEpNum === lastEpNum ? `E${firstEpNum}` : `E${firstEpNum}-E${lastEpNum}`;
                 } else if (firstEpisode.includes('Special')) {
                     episodeRange = `Special1-Special${episodes.length}`;
                 } else {
                     episodeRange = `E1-E${episodes.length}`;
                 }
-            } else {
-                seasonInfo = 'S1';
-                episodeRange = 'E1';
             }
             
-            // 生成文件名：片名-季-集
             const filename = `${cleanTitle}-${seasonInfo}-${episodeRange}`;
-            
             let fileContent, mimeType;
             
             if (format === 'csv') {
-                // 检测是否为Trakt.tv数据（包含更多字段）
                 const isTrakt = episodes.length > 0 && episodes[0].hasOwnProperty('watchers');
+                const headers = isTrakt ? 
+                    ['集数', '标题', '评分', '投票数', '观看者', '播放次数', '收藏数', '列表数', '播出日期', '时长', '链接'] :
+                    ['集数', '标题', '评分', '打分人数', '链接'];
                 
-                let headers, tsvContent;
+                const tsvContent = [headers.join('\t')];
                 
-                if (isTrakt) {
-                    // Trakt.tv的TSV格式
-                    headers = ['集数', '标题', '评分', '投票数', '观看者', '播放次数', '收藏数', '列表数', '播出日期', '时长', '链接'];
-                    tsvContent = [headers.join('\t')];
+                episodes.forEach(episode => {
+                    const row = isTrakt ? [
+                        episode.episodeNumber, episode.title, episode.rating, episode.voteCount,
+                        episode.watchers, episode.plays, episode.collected, episode.lists,
+                        episode.airDate, episode.runtime, episode.link
+                    ] : [
+                        episode.episodeNumber, episode.title, episode.rating, episode.voteCount, episode.link
+                    ];
                     
-                    episodes.forEach(episode => {
-                        const row = [
-                            episode.episodeNumber || '',
-                            episode.title || '',
-                            episode.rating || '',
-                            episode.voteCount || '',
-                            episode.watchers || '',
-                            episode.plays || '',
-                            episode.collected || '',
-                            episode.lists || '',
-                            episode.airDate || '',
-                            episode.runtime || '',
-                            episode.link || ''
-                        ];
-                        // 处理包含制表符或换行符的字段
-                        const cleanRow = row.map(field => 
-                            String(field).replace(/\t/g, ' ').replace(/\n/g, ' ').replace(/\r/g, '')
-                        );
-                        tsvContent.push(cleanRow.join('\t'));
-                    });
-                } else {
-                    // IMDb的TSV格式
-                    headers = ['集数', '标题', '评分', '打分人数', '链接'];
-                    tsvContent = [headers.join('\t')];
-                    
-                    episodes.forEach(episode => {
-                        const row = [
-                            episode.episodeNumber || '',
-                            episode.title || '',
-                            episode.rating || '',
-                            episode.voteCount || '',
-                            episode.link || ''
-                        ];
-                        // 处理包含制表符或换行符的字段
-                        const cleanRow = row.map(field => 
-                            String(field).replace(/\t/g, ' ').replace(/\n/g, ' ').replace(/\r/g, '')
-                        );
-                        tsvContent.push(cleanRow.join('\t'));
-                    });
-                }
+                    const cleanRow = row.map(field => 
+                        String(field || '').replace(/\t/g, ' ').replace(/\n/g, ' ').replace(/\r/g, '')
+                    );
+                    tsvContent.push(cleanRow.join('\t'));
+                });
                 
                 fileContent = tsvContent.join('\n');
                 mimeType = 'text/tab-separated-values';
             } else {
-                // 生成JSON格式
                 fileContent = JSON.stringify(episodes, null, 2);
                 mimeType = 'application/json';
             }
             
-            // 创建下载链接
             const blob = new Blob([fileContent], { type: mimeType });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -597,5 +400,8 @@
             alert('下载失败，请查看控制台了解详情。');
         }
     }
+
+    // 初始化
+    window.addEventListener('load', addExtractButton);
 
 })();
