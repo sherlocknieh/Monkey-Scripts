@@ -1,8 +1,8 @@
 // ==UserScript==
 // @namespace    http://tampermonkey.net/
 // @name         Porn GIF Tools
-// @version      1.0
 // @grant        none
+// @version      1.0
 // @match        https://*.pornhub.com/*
 // @match        https://www.sex.com/*
 // @description  Porn GIF Tools
@@ -100,8 +100,15 @@
             setTimeout(() => {
                 observer.disconnect();
                 removeInitialMute(); // 超时后仍然执行一次
-            }, 2000); // 10秒超时
+            }, 2000); // 2秒超时
         }
+
+        // 页面变为可见时再尝试取消静音
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                removeInitialMute();
+            }
+        });
     }
 
     // 主图处理函数
