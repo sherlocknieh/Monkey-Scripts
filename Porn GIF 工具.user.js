@@ -11,7 +11,8 @@
 (function() {
     'use strict';
 
-    const { hostname, href: url } = window.location;
+    const hostname = window.location.hostname;
+    const url = window.location.href;
     
     // 常量定义
     const SELECTORS = {
@@ -21,28 +22,24 @@
         searchButton: '.search-button'
     };
     
-    const DELAYS = { initial: 100, retry: 200, observer: 100, load: 200 };
-    const LIMITS = { maxRetries: 10, observerTimeout: 5000 };
 
     // 工具函数
     const utils = {
-        // 延迟执行
-        delay: (fn, ms) => setTimeout(fn, ms),
         
         // DOM就绪检查
         whenReady: (callback) => {
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', callback);
             } else {
-                utils.delay(callback, DELAYS.initial);
+                setTimeout(callback, 100);
             }
         },
         
         // 创建DOM观察器
-        observe: (callback, timeout = LIMITS.observerTimeout) => {
+        observe: (callback, timeout = 5000) => {
             const observer = new MutationObserver(callback);
             observer.observe(document.body, { childList: true, subtree: true });
-            if (timeout > 0) utils.delay(() => observer.disconnect(), timeout);
+            if (timeout > 0) setTimeout(() => observer.disconnect(), timeout);
             return observer;
         },
         
@@ -68,7 +65,6 @@
 
     // Pornhub音量控制
     function initVolumeControl() {
-        let retryCount = 0;
         
         // 取消静音核心逻辑
         const unmute = () => {
@@ -92,9 +88,10 @@
         };
 
         // // 重试逻辑
+        // let retryCount = 0;
         // (function retry() {
-        //     if (unmute() || retryCount++ >= LIMITS.maxRetries) return;
-        //     utils.delay(retry, DELAYS.retry * retryCount);
+        //     if (unmute() || retryCount++ >= 10) return;
+        //     setTimeout(retry, DELAYS.retry * retryCount);
         // })(); // 立即执行
         
 
@@ -107,7 +104,7 @@
         });
 
         // 页面可见性变化时尝试取消静音
-        document.addEventListener('visibilitychange', () => !document.hidden && utils.delay(unmute, DELAYS.observer));
+        document.addEventListener('visibilitychange', () => !document.hidden && setTimeout(unmute, 100));
     }
 
     // Sex.com功能
@@ -142,10 +139,13 @@
         
         // 样式设置
         Object.assign(button.style, {
-            position: 'absolute', top: '5px', right: '5px',
-            padding: '5px 10px', background: 'rgba(0,0,0,0.7)',
-            color: 'white', border: 'none', borderRadius: '5px',
-            cursor: 'pointer', zIndex: '1000', fontSize: '12px'
+            position: 'absolute',
+            top: '5px', right: '5px',
+            padding: '5px 10px',
+            background: 'rgba(0,0,0,0.7)',
+            color: 'white',
+            border: 'none', borderRadius: '5px',
+            cursor: 'pointer', fontSize: '12px'
         });
         
         // 确保父元素定位
