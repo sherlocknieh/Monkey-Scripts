@@ -379,7 +379,7 @@
                 });
                 
                 fileContent = tsvContent.join('\n');
-                mimeType = 'text/tab-separated-values';
+                mimeType = 'text/csv';
             } else {
                 fileContent = JSON.stringify(episodes, null, 2);
                 mimeType = 'application/json';
@@ -402,7 +402,10 @@
         }
     }
 
-    // 初始化
-    window.addEventListener('load', addExtractButton);
-
+    // 主程序: DOM加载完成后添加提取按钮
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', addExtractButton);
+    } else {
+        addExtractButton();
+    }
 })();
