@@ -3,17 +3,16 @@
 // @name         剧集信息提取器
 // @grant        none
 // @version      2.0
+// @description  提取 IMDb, Trakt.tv 剧集页面的剧集信息
 // @match        https://*.imdb.com/title/*/episodes*
 // @match        https://trakt.tv/shows/*/seasons/*
 // @exclude      https://trakt.tv/shows/*/seasons/*/episodes/*
-// @description  提取 IMDb, Trakt.tv 剧集页面的剧集信息
 // ==/UserScript==
 
 (function() {
     'use strict';
 
     let episodes = [];
-    let extractButton = null;
     let downloadButton = null;
 
     // 公共样式配置
@@ -69,40 +68,45 @@
         `
     };
 
-    // 创建样式表
-    function addStyles() {
-        if (!document.getElementById('episode-extractor-styles')) {
-            const style = document.createElement('style');
-            style.id = 'episode-extractor-styles';
-            style.textContent = STYLES.spinner;
-            document.head.appendChild(style);
-        }
+
+    // 主程序: DOM加载完成后添加提取按钮
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', addExtractButton);
+    } else {
+        addExtractButton();
     }
 
-    // 创建按钮的通用函数
-    function createButton(text, styles, onClick) {
-        const button = document.createElement('button');
-        button.textContent = text;
-        button.style.cssText = STYLES.button.base + styles;
-        button.addEventListener('click', onClick);
-        
-        // 添加悬停效果
-        const originalBg = button.style.backgroundColor;
-        const hoverBg = originalBg === '#f5c518' ? '#e6b800' : 
-                       originalBg === '#4CAF50' ? '#45a049' : '#1976D2';
-        
-        button.addEventListener('mouseenter', () => {
-            if (!button.disabled) button.style.backgroundColor = hoverBg;
-        });
-        button.addEventListener('mouseleave', () => {
-            if (!button.disabled) button.style.backgroundColor = originalBg;
-        });
-        
-        return button;
+    // 创建提取按钮
+    function addExtractButton() {
+        utils.createButton('提取剧集信息', STYLES.button.extract, extractEpisodeInfo);
     }
+
+
 
     // 工具函数
     const utils = {
+        // 通用按钮创建函数
+        createButton: (text, styles, onClick) => {
+            const button = document.createElement('button');    // 创建按钮元素
+
+            button.textContent = text;                          // 设置按钮文本
+            button.addEventListener('click', onClick);          // 绑定点击事件
+            button.style.cssText = STYLES.button.base + styles; // 自定义样式
+            
+            // 添加悬停效果
+            const originalBg = button.style.backgroundColor;
+            const hoverBg = originalBg === '#f5c518' ? '#e6b800' : 
+                           originalBg === '#4CAF50' ? '#45a049' : '#1976D2';
+            
+            button.addEventListener('mouseenter', () => {
+                if (!button.disabled) button.style.backgroundColor = hoverBg;
+            });
+            button.addEventListener('mouseleave', () => {
+                if (!button.disabled) button.style.backgroundColor = originalBg;
+            });
+            document.body.appendChild(button);      // 将按钮添加到页面
+        },
+
         formatNumber: (num) => {
             const n = parseInt(num) || 0;
             return n >= 1000000 ? (n / 1000000).toFixed(1) + 'M' :
@@ -226,15 +230,6 @@
             }
         }
     };
-
-    // 主要功能函数
-    function addExtractButton() {
-        if (extractButton) return;
-        
-        addStyles();
-        extractButton = createButton('提取剧集信息', STYLES.button.extract, extractEpisodeInfo);
-        document.body.appendChild(extractButton);
-    }
 
     function extractEpisodeInfo() {
         console.log('开始提取剧集信息...');
@@ -402,10 +397,4 @@
         }
     }
 
-    // 主程序: DOM加载完成后添加提取按钮
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', addExtractButton);
-    } else {
-        addExtractButton();
-    }
 })();

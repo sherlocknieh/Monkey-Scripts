@@ -4,6 +4,7 @@
 // @grant        none
 // @version      1.4
 // @match        https://*.pornhub.com/*
+// @match        https://nsfw.xxx/*
 // @match        https://www.sex.com/*
 // @description  Porn GIF Tools
 // ==/UserScript==
@@ -11,159 +12,180 @@
 (function() {
     'use strict';
 
-    const hostname = window.location.hostname;
-    const url = window.location.href;
-    
-    // 常量定义
-    const SELECTORS = {
-        volumeButtons: ['js-volumeToggle', 'js-volumeToggleModal'],
-        videoPlayer: 'gifWebmPlayer',
-        sexComImage: 'img[data-testid="pin-carousel-image"]',
-        searchButton: '.search-button'
-    };
-    
+    const url = window.location.href; // 获取当前页面URL
 
-    // 工具函数
-    const utils = {
-        
-        // DOM就绪检查
-        whenReady: (callback) => {
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', callback);
-            } else {
-                setTimeout(callback, 100);
-            }
-        },
-        
-        // 创建DOM观察器
-        observe: (callback, timeout = 5000) => {
-            const observer = new MutationObserver(callback);
-            observer.observe(document.body, { childList: true, subtree: true });
-            if (timeout > 0) setTimeout(() => observer.disconnect(), timeout);
-            return observer;
-        },
-        
-        // 检查元素是否为目标元素
-        isTargetElement: (node, targets) => {
-            if (node.nodeType !== 1) return false;
-            return targets.some(target => 
-                node.id === target || node.querySelector(`#${target}`)
-            );
-        }
-    };
+    if (url.includes('pornhub.com')) {
+        // 替换 pornhub.com 图标
+        const icon = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
+            <circle cx="32" cy="32" r="32" fill="black"/>
+            <text x="32" y="42" text-anchor="middle" font-size="32" fill="white">!</text>
+        </svg>`;
 
-    // 主流程
-    function main() {
+        document.querySelectorAll('link[rel*="icon"]').forEach(link => {
+            link.href = 'data:image/svg+xml;base64,' + btoa(icon);
+            link.type = 'image/svg+xml';
+        });
+        
+        // 优先跳转到 GIF 搜索页
         if (url.includes('pornhub.com/video/search')) {
             window.location.replace(url.replace('video', 'gif'));
-        } else if (url.includes('pornhub.com/gif/')) {
-            utils.whenReady(initVolumeControl);
-        } else if (hostname === 'www.sex.com') {
-            initSexComFeatures();
+        }
+        // 取消 GIF 静音
+        else if (url.includes('pornhub.com/gif/')) {
+            pornhub_gif_unmute();
         }
     }
+    else if (url.includes('www.sex.com')) {
+        sex_com_features();
+    }
+    else if (url.includes('nsfw.xxx')) {
+        nsfw_vid_unmute();
+    }
 
-    // Pornhub音量控制
-    function initVolumeControl() {
-        
-        // 取消静音核心逻辑
+    
+    // 功能函数
+    function pornhub_gif_unmute() {
+        // 取消静音函数
         const unmute = () => {
-            const elements = [
-                ...SELECTORS.volumeButtons.map(id => document.getElementById(id)),
-                document.getElementById(SELECTORS.videoPlayer)
-            ].filter(Boolean);
+            console.log('尝试取消GIF静音');
+            const volumeToggle = document.getElementById('js-volumeToggle');
+            const gifWebmPlayer = document.getElementById('gifWebmPlayer');
+            if (volumeToggle && gifWebmPlayer) {
+                volumeToggle.classList.remove('muted');
+                gifWebmPlayer.muted = false;
+                gifWebmPlayer.volume = 1;
+            } else {
+                console.log('未发现 js-volumeToggle 和 gifWebmPlayer 元素');
+            }
+        };
+
+        // 网页加载完全后执行一次
+        window.addEventListener('load', () => setTimeout(unmute, 100));
+
+        // 页面切换到前台时执行一次
+        document.addEventListener('visibilitychange', () => !document.hidden && unmute());
+    }
+
+    
+    function sex_com_features() {
+        const img = document.querySelector('img[data-testid="pin-carousel-image"]');
+        if (!img) {console.log('未发现目标图片'); return;}
+
+        // 添加按钮函数
+        const addButton = (img) => {
+
+            console.log('尝试添加格式切换按钮');
+
+            const parent = img.parentElement;
+            if (!parent) return;
+
+            console.log('header parent found:', parent);
             
-            let success = false;
-            elements.forEach(el => {
-                if (el.classList?.contains('muted')) {
-                    el.classList.remove('muted');
-                    success = true;
-                } else if (el.tagName === 'VIDEO') {
-                    Object.assign(el, { muted: false, volume: 1 });
-                    success = true;
-                }
+            // 创建按钮
+            const button = Object.assign(document.createElement('button'), {
+                className: 'switch-button',
+                textContent: 'Webp→GIF',
+                title: '将当前图片从 Webp 格式切换为 GIF 格式',
             });
             
-            return success;
-        };
 
-        // // 重试逻辑
-        // let retryCount = 0;
-        // (function retry() {
-        //     if (unmute() || retryCount++ >= 10) return;
-        //     setTimeout(retry, DELAYS.retry * retryCount);
-        // })(); // 立即执行
-        
-
-        // 监听目标元素添加 - 重点监听volumeButtons
-        const targets = [...SELECTORS.volumeButtons, SELECTORS.videoPlayer];
-        utils.observe(mutations => {
-            if (mutations.some(m => Array.from(m.addedNodes).some(n => utils.isTargetElement(n, targets)))) {
-                unmute(); // 发现目标元素立即执行，不延迟
+            // 样式设置
+            if (getComputedStyle(parent).position === 'static') {
+                parent.style.position = 'relative';   // 确保父元素定位
             }
-        });
-
-        // 页面可见性变化时尝试取消静音
-        document.addEventListener('visibilitychange', () => !document.hidden && setTimeout(unmute, 100));
-    }
-
-    // Sex.com功能
-    function initSexComFeatures() {
-        const processImage = () => {
-            const img = document.querySelector(SELECTORS.sexComImage);
-            if (!img) return;
+            Object.assign(button.style, {
+                position: 'absolute',
+                top: '5px', right: '5px',
+                padding: '5px 10px',
+                background: 'rgba(0,0,0,0.7)',
+                color: 'white',
+                border: 'none', borderRadius: '5px',
+                cursor: 'pointer', fontSize: '12px'
+            });
             
-            // Webp转GIF
-            if (img.src.includes('.webp')) {
-                img.src = img.src.replace('.webp', '.gif');
-            }
             
-            addSearchButton(img);
-        };
-
-        processImage();
-        utils.observe((mutations) => {
-            if (mutations.some(m => m.addedNodes.length > 0)) processImage();
-        }, 0);
-    }
-
-    // 添加搜图按钮
-    function addSearchButton(img) {
-        const parent = img.parentElement;
-        if (!parent || parent.querySelector(SELECTORS.searchButton)) return;
-        
-        const button = Object.assign(document.createElement('button'), {
-            className: 'search-button',
-            textContent: 'NameThatPorn'
-        });
-        
-        // 样式设置
-        Object.assign(button.style, {
-            position: 'absolute',
-            top: '5px', right: '5px',
-            padding: '5px 10px',
-            background: 'rgba(0,0,0,0.7)',
-            color: 'white',
-            border: 'none', borderRadius: '5px',
-            cursor: 'pointer', fontSize: '12px'
-        });
-        
-        // 确保父元素定位
-        if (getComputedStyle(parent).position === 'static') {
-            parent.style.position = 'relative';
+            // 注册点击事件
+            button.onclick = (e) => {
+                e.preventDefault();     // 阻止默认行为
+                e.stopPropagation();    // 阻止事件冒泡
+                if (img.src.includes('.webp')) {
+                    img.src = img.src.replace('.webp', '.gif');
+                    button.textContent = 'GIF→Webp';
+                    button.title = '将当前图片从 GIF 格式切换为 Webp 格式';
+                } else if (img.src.includes('.gif')) {
+                    img.src = img.src.replace('.gif', '.webp');
+                    button.textContent = 'Webp→GIF';
+                    button.title = '将当前图片从 Webp 格式切换为 GIF 格式';
+                }
+            };
+            
+            // 添加按钮
+            parent.appendChild(button);
         }
-        
-        // 点击事件
-        button.onclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const searchUrl = img.src.replace('.gif', '.webp');
-            window.open(`https://namethatporn.com/search/images.html?url=${encodeURIComponent(searchUrl)}`, '_blank');
-        };
-        
-        parent.appendChild(button);
+
+        // 网页加载完全后执行一次
+        window.addEventListener('load', () => setTimeout(() => addButton(img), 1000));
     }
 
-    // 启动
-    main();
+
+    function nsfw_vid_unmute() {
+        // 处理单个视频元素：取消静音并设置音量
+        const handleVideo = (video) => {
+            try {
+                if (!video) return; // 跳过无效节点
+                video.muted = false; // 取消静音
+                if (typeof video.volume !== 'undefined') video.volume = 1; // 设置最大音量
+            } catch (e) {}
+        };
+
+        // 使用 IntersectionObserver 监听视频是否在视口内
+        // 当视频进入视口时自动播放，离开视口时自动暂停
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                const v = entry.target;
+                if (entry.isIntersecting) {
+                    // 视频可见时尝试播放
+                    try { v.play().catch(()=>{}); } catch (e) {}
+                } else {
+                    // 视频不可见时尝试暂停
+                    try { v.pause(); } catch (e) {}
+                }
+            });
+        }, { threshold: 0.25 }); // 视口重叠比例达到 25% 时触发
+
+        // 处理页面上已存在的所有视频
+        const processExisting = () => {
+            const videos = Array.from(document.querySelectorAll('video'));
+            videos.forEach(v => {
+                handleVideo(v); // 取消静音并设置音量
+                try { io.observe(v); } catch (e) {} // 监听可见性变化
+            });
+        };
+
+        // 监听 DOM 变化，自动处理新添加的视频元素
+        const mo = new MutationObserver(mutations => {
+            for (const m of mutations) {
+                for (const node of m.addedNodes) {
+                    if (!node) continue;
+                    if (node.nodeType === 1) {
+                        if (node.tagName === 'VIDEO') {
+                            // 新增 video 元素，立即处理
+                            handleVideo(node);
+                            try { io.observe(node); } catch (e) {}
+                        } else if (node.querySelector) {
+                            // 新增的节点下有 video 子元素，也要处理
+                            const v = node.querySelector('video');
+                            if (v) { handleVideo(v); try { io.observe(v); } catch (e) {} }
+                        }
+                    }
+                }
+            }
+        });
+        // 监听整个页面的子节点变化
+        mo.observe(document.body, { childList: true, subtree: true });
+
+        // 首次处理页面上已有的视频
+        processExisting();
+    }
 })();
