@@ -33,10 +33,10 @@
         if (url.includes('pornhub.com')) {
             // 替换 pornhub.com 图标
             const icon = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
-            <circle cx="32" cy="32" r="32" fill="black"/>
-            <text x="32" y="42" text-anchor="middle" font-size="32" fill="white">!</text>
-        </svg>`;
+                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
+                    <circle cx="32" cy="32" r="32" fill="black"/>
+                    <text x="32" y="42" text-anchor="middle" font-size="32" fill="white">!</text>
+                </svg>`;
 
             document.querySelectorAll('link[rel*="icon"]').forEach(link => {
                 link.href = 'data:image/svg+xml;base64,' + btoa(icon);
@@ -80,16 +80,19 @@
             console.log('正在取消GIF静音');
             const volumeToggle = document.getElementById('js-volumeToggle');
             const gifWebmPlayer = document.getElementById('gifWebmPlayer');
-            if (volumeToggle && gifWebmPlayer) {
-                volumeToggle.classList.remove('muted');
+            if (gifWebmPlayer) {
                 gifWebmPlayer.muted = false;
                 gifWebmPlayer.volume = 1;
             } else {
-                console.log('未发现 js-volumeToggle 和 gifWebmPlayer 元素');
+                console.log('未发现 gifWebmPlayer 元素');
+            }
+            if (volumeToggle && volumeToggle.classList.contains('muted')) {
+                volumeToggle.click();
+                volumeToggle.classList.remove('muted');
             }
         };
 
-        window.addEventListener('load', () => setTimeout(unmute, 100));
+        window.addEventListener('load', () => setTimeout(unmute, 500));
         document.addEventListener('visibilitychange', () => !document.hidden && unmute());
     }
 
