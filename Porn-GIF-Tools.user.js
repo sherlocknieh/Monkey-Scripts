@@ -8,6 +8,7 @@
 // @match        https://musedam.cc/*
 // @match        https://nsfw.xxx/*
 // @match        https://anacams.com/post/*
+// @match        https://rule34.xxx/*
 // @grant        none
 // @run-at       document-end
 // @description  Greasyfork 和 Sleazyfork 页面互链
