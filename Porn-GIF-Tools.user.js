@@ -1,7 +1,7 @@
 // ==UserScript==
 // @namespace    http://tampermonkey.net/
 // @name         Porn GIF Tools
-// @version      2025.11.03-18
+// @version      2025/11/06 01:13
 // @match        https://greasyfork.org/*
 // @match        https://sleazyfork.org/*
 // @match        https://*.pornhub.com/*
@@ -9,6 +9,7 @@
 // @match        https://nsfw.xxx/*
 // @match        https://anacams.com/post/*
 // @grant        none
+// @run-at       document-end
 // @description  Greasyfork 和 Sleazyfork 页面互链
 // @description  Pornhub GIF 自动取消静音, GIF 搜索页与 Video 搜索页跳转按钮, Pornhub 标签栏图标替换
 // @description  Musedam 视频自动播放
@@ -51,108 +52,89 @@
     }
 
     function handle_pornhub() {
+        // 取消GIF静音
         const unmute = () => {
             console.log('正在取消GIF静音');
-            const volumeToggle = document.getElementById('js-volumeToggle');
             const gifWebmPlayer = document.getElementById('gifWebmPlayer');
             if (gifWebmPlayer) {
-                gifWebmPlayer.muted = false;
-                gifWebmPlayer.volume = 1;
+                video_unmute(gifWebmPlayer);
             } else {
                 console.log('未发现 gifWebmPlayer 元素');
             }
+            const volumeToggle = document.getElementById('js-volumeToggle');
             if (volumeToggle && volumeToggle.classList.contains('muted')) {
                 volumeToggle.click();
                 volumeToggle.classList.remove('muted');
             }
         };
-
         window.addEventListener('load', () => setTimeout(unmute, 500));
         document.addEventListener('visibilitychange', () => !document.hidden && unmute());
 
         // 替换 pornhub.com 图标
-        const icon = `
+        document.querySelectorAll('link[rel*="icon"]').forEach(link => {
+            link.href = 'data:image/svg+xml;base64,' + btoa(`
             <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
                 <circle cx="32" cy="32" r="32" fill="black"/>
                 <text x="32" y="42" text-anchor="middle" font-size="32" fill="white">PH</text>
-            </svg>`;
-        document.querySelectorAll('link[rel*="icon"]').forEach(link => {
-            link.href = 'data:image/svg+xml;base64,' + btoa(icon);
+            </svg>`);
             link.type = 'image/svg+xml';
         });
 
         // GIF 搜索页与 video 搜索页互转按钮
-        if (url.includes('pornhub.com/video/search')) {
+        if (url.includes('search')) {
+            const isVideo = url.includes('video/search');
             const button = document.createElement('button');
-            button.textContent = '切换到 GIF 搜索';
-            button.onclick = () => {
-                window.location.replace(url.replace('video', 'gif'));
-            };
             document.body.appendChild(button);
+            button.textContent = isVideo ? 'to GIF' : 'to Video';
+            Object.assign(button.style, {
+                position: 'fixed',
+                bottom: '20px',
+                right: '20px',
+                padding: '10px 15px',
+                zIndex: 1,
+                backgroundColor: '#ff9900',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontSize: '16px',
+                boxShadow: '0 2px 5px rgba(0,0,0,0.3)'
+            });
+            button.onclick = () => {
+                const newUrl = isVideo ? url.replace('video', 'gifs') : url.replace('gifs', 'video');
+                window.location.replace(newUrl);
+            };
         }
     }
 
     function handle_musedam() {
-        // 路由事件统一分发
-        const dispatchLocationChange = () => window.dispatchEvent(new Event('locationchange'));
 
-        // 仅补丁一次：拦截 pushState/replaceState，并补齐 popstate/pageshow 触发
-        if (!window.__musedam_history_patched__) {
-            try {
-                const rawPush = history.pushState;
-                history.pushState = function () {
-                    const ret = rawPush.apply(this, arguments);
-                    dispatchLocationChange();
-                    return ret;
-                };
-                const rawReplace = history.replaceState;
-                history.replaceState = function () {
-                    const ret = rawReplace.apply(this, arguments);
-                    dispatchLocationChange();
-                    return ret;
-                };
-                window.addEventListener('popstate', dispatchLocationChange);
-                window.addEventListener('pageshow', () => dispatchLocationChange()); // 兼容 bfcache
-                window.__musedam_history_patched__ = true;
-            } catch { }
-        }
-
-        // 业务：进入 detail 时执行
-        const isDetail = () => {
-            const p = location.pathname || '';
-            return p === '/detail' || p.startsWith('/detail/');
+        // 改写 pushState 和 replaceState, 实现单页应用的路由事件监听
+        const rawPush = history.pushState;
+        history.pushState = function (...args) {
+            console.warn('pushState 被调用 \n新URL: ', args[2]);
+            window.dispatchEvent(new Event('locationchange'));
+            return rawPush.apply(this, args);
         };
 
-        const tryPlayFirstVideo = () => {
-            try {
+        const rawReplace = history.replaceState;
+        history.replaceState = function (...args) {
+            console.warn('replaceState 被调用 \n新URL: ', args[2]);
+            window.dispatchEvent(new Event('locationchange'));
+            return rawReplace.apply(this, args);
+        };
+
+        // 播放视频
+        const autoPlayVideo = () => {
+            if (location.pathname.includes('/detail')) {
                 const v = document.querySelector('video');
                 if (!v) return false;
-                // 不强制取消静音，避免自动播放策略阻止
-                try { v.play().catch(() => { }); } catch { }
-                return true;
-            } catch { return false; }
+                v.play();
+            }
         };
-
-        const onEnterDetail = () => {
-            console.log('[Porn GIF Tools] musedam: enter /detail');
-            if (tryPlayFirstVideo()) return;
-
-            // 等待 DOM 渲染出视频元素
-            const mo = new MutationObserver(() => {
-                if (tryPlayFirstVideo()) {
-                    try { mo.disconnect(); } catch { }
-                }
-            });
-            try { mo.observe(document.body, { childList: true, subtree: true }); } catch { }
-            setTimeout(() => { try { mo.disconnect(); } catch { } }, 10000); // 超时兜底
-        };
-
-        const tryEnterDetail = () => { if (isDetail()) onEnterDetail(); };
-
-        // 触发时机：多次短延时重试，兼容 DOM 异步渲染与 bfcache 恢复
-        const scheduleTry = () => [0, 50, 200, 500, 1000].forEach(d => setTimeout(tryEnterDetail, d));
-        window.addEventListener('locationchange', scheduleTry);
-        document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleTry(); });
-        scheduleTry(); // 首次进入
+        // 路由发生变化时触发
+        window.addEventListener('locationchange', autoPlayVideo);
+        // 页面切回前台时触发
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) autoPlayVideo(); });
     }
 })();
