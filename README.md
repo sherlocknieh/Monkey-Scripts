@@ -7,4 +7,4 @@
 
 - [Porn GIF 工具](https://github.com/sherlocknieh/MonkeyScripts/raw/main/Porn-GIF-Tools.user.js)
 
-- [调试脚本]([http](https://github.com/sherlocknieh/MonkeyScripts/raw/main/Debug-Script.user.js))
+- [调试脚本](https://github.com/sherlocknieh/MonkeyScripts/raw/main/Debug-Script.user.js)
