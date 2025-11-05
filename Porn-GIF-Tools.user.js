@@ -109,29 +109,35 @@
 
     function handle_musedam() {
 
-        // 改写 pushState 和 replaceState, 实现单页应用的路由事件监听
+        // 实现单页应用的路由事件监听
         const rawPush = history.pushState;
         history.pushState = function (...args) {
-            console.warn('pushState 被调用 \n新URL: ', args[2]);
-            window.dispatchEvent(new Event('locationchange'));
-            return rawPush.apply(this, args);
+            window.dispatchEvent(new Event('locationchange'));  // 触发自定义事件
+            return rawPush.apply(this, args);                   // 调用原始函数
         };
 
         const rawReplace = history.replaceState;
         history.replaceState = function (...args) {
-            console.warn('replaceState 被调用 \n新URL: ', args[2]);
-            window.dispatchEvent(new Event('locationchange'));
-            return rawReplace.apply(this, args);
+            window.dispatchEvent(new Event('locationchange'));  // 触发自定义事件
+            return rawReplace.apply(this, args);                // 调用原始函数
         };
 
-        // 播放视频
+        // 视频播放逻辑
         const autoPlayVideo = () => {
-            if (location.pathname.includes('/detail')) {
-                const v = document.querySelector('video');
-                if (!v) return false;
+            setTimeout(() => { // 延时等待新页面加载
+                const currentPath = location.pathname;
+                if (currentPath.includes('/detail')) {
+                    console.warn('已进入视频页面，尝试自动播放视频');
+                    const v = document.querySelector('video');
+                    if (!v) {
+                    console.warn('未捕获到 video 元素');
+                    return false;
+                }
                 v.play();
-            }
+                console.warn('已触发视频播放');
+            }}, 500);
         };
+
         // 路由发生变化时触发
         window.addEventListener('locationchange', autoPlayVideo);
         // 页面切回前台时触发

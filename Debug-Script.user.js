@@ -15,13 +15,13 @@
 
     const rawPush = history.pushState;
     history.pushState = function (...args) {
-        console.warn('pushState 被调用 \n新URL: ', args[2]);
+        console.warn('发生路由跳转 \n新URL: ', args[2], ' \n保留历史记录');
         return rawPush.apply(this, args);
     };
 
     const rawReplace = history.replaceState;
     history.replaceState = function (...args) {
-        console.warn('replaceState 被调用 \n新URL: ', args[2]);
+        console.warn('发生路由跳转 \n新URL: ', args[2], '\n覆盖历史记录');
         return rawReplace.apply(this, args);
     };
     
