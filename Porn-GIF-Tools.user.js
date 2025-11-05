@@ -1,7 +1,7 @@
 // ==UserScript==
 // @namespace    http://tampermonkey.net/
 // @name         Porn GIF Tools
-// @version      2025.11.06.0150
+// @version      2025.11.06.0203
 // @match        https://greasyfork.org/*
 // @match        https://sleazyfork.org/*
 // @match        https://*.pornhub.com/*
