@@ -1,7 +1,7 @@
 // ==UserScript==
 // @namespace    Violentmonkey Scripts
 // @name         Porn GIF Tools
-// @version      2025.11.07.0006
+// @version      2025.11.07.0340
 // @grant        none
 // @match        https://greasyfork.org/*
 // @match        https://sleazyfork.org/*
@@ -18,25 +18,72 @@
 
 (function main() {
 
-    const url = window.location.href;
+    // 元素追踪器
+    class ElementTracker {
+        constructor(root = document.body) {
+            if (ElementTracker.instance) {
+                return ElementTracker.instance;
+            }
+            this.selectorMap = new Map();
+            this.seen = new WeakSet();
+            this.root = root;
+            this.observer = new MutationObserver(this._handleMutations.bind(this));
+            this.observer.observe(this.root, { childList: true, subtree: true });
+            ElementTracker.instance = this;
+        }
+    
+        track(selector, callback) {
+            this.selectorMap.set(selector, callback);
+            this.root.querySelectorAll(selector).forEach(el => {
+                if (!this.seen.has(el)) {
+                    this.seen.add(el);
+                    callback(el);
+                }
+            });
+            return this;
+        }
+    
+        _handleMutations(mutationsList) {
+            for (const mutation of mutationsList) {
+                for (const node of mutation.addedNodes) {
+                    if (node.nodeType === 1) {
+                        this.selectorMap.forEach((callback, selector) => {
+                            if (node.matches?.(selector) && !this.seen.has(node)) {
+                                this.seen.add(node);
+                                callback(node);
+                            }
+                            node.querySelectorAll?.(selector)?.forEach(elem => {
+                                if (!this.seen.has(elem)) {
+                                    this.seen.add(elem);
+                                    callback(elem);
+                                }
+                            });
+                        });
+                    }
+                }
+            }
+        }
+    
+        disconnect() {
+            this.observer.disconnect();
+        }
+    }
+    
+    // 视频自动取消静音-通用版
+    const tracker = new ElementTracker();
+    tracker.track('video', elem => {
+        console.warn('发现 video 元素', elem);
+        elem.volume = 0.5;
+        elem.muted = false;
+        console.warn('已取消静音');
+    });
 
+    
+    const url = window.location.href;
     if (url.includes('fork.org')) handle_fork();
     else if (url.includes('pornhub.com')) handle_pornhub();
     else if (url.includes('musedam.cc')) handle_musedam();
-    else video_unmute();
 
-    function video_unmute(videoElement) {
-        if (!videoElement) {
-            videoElement = document.querySelector('video');
-            if (url.includes('nsfw.xxx')) {
-                videoElement = document.querySelector('.video-preview--source');
-            }
-        }
-        if (videoElement) {
-            videoElement.muted = false;
-            videoElement.volume = 0.5;
-        }
-    }
 
     function handle_fork() {
         const isGreasy = url.includes('greasyfork.org');
@@ -54,13 +101,14 @@
     function handle_pornhub() {
         // 取消GIF静音
         const unmute = () => {
-            console.log('正在取消GIF静音');
-            const gifWebmPlayer = document.getElementById('gifWebmPlayer');
-            if (gifWebmPlayer) {
-                video_unmute(gifWebmPlayer);
-            } else {
-                console.log('未发现 gifWebmPlayer 元素');
-            }
+            // console.log('正在取消GIF静音');
+            // const gifWebmPlayer = document.getElementById('gifWebmPlayer');
+            // if (gifWebmPlayer) {
+            //     gifWebmPlayer.muted = false;
+            //     gifWebmPlayer.volume = 0.5;
+            // } else {
+            //     console.log('未发现 gifWebmPlayer 元素');
+            // }
             const volumeToggle = document.getElementById('js-volumeToggle');
             if (volumeToggle && volumeToggle.classList.contains('muted')) {
                 volumeToggle.click();
