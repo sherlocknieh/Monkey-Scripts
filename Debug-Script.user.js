@@ -1,7 +1,7 @@
 // ==UserScript==
 // @namespace   Violentmonkey Scripts
 // @name        调试脚本
-// @version     1.1.4
+// @version     1.1.5
 // @grant       none
 // @match       https://**/*
 // @description 通用调试和代码参考
@@ -24,24 +24,45 @@
     };
 
     // 动态新增元素监听器
+    const selectorMap = new Map();    // 选择器-回调映射
+    const seen = new WeakSet();    // 元素去重集合
+    // 监听注册函数
+    function observeNewElements(selector, callback) {
+        selectorMap.set(selector, callback);
+    }
+    // 全局 observer
     new MutationObserver((mutationsList) => {
-        // 遍历所有变更记录
         for (const mutation of mutationsList) {
-            // 遍历所有新增节点
             for (const node of mutation.addedNodes) {
-                // 排除非 HTMLElement 节点
                 if (node.nodeType === 1) {
-                    newNodeHandler(node);
+                    selectorMap.forEach((callback, selector) => {
+                        // 自身匹配
+                        if (node.matches && node.matches(selector) && !seen.has(node)) {
+                            seen.add(node);
+                            callback(node);
+                        }
+                        // 后代匹配
+                        if (node.querySelectorAll) {
+                            node.querySelectorAll(selector).forEach(elem => {
+                                if (!seen.has(elem)) {
+                                    seen.add(elem);
+                                    callback(elem);
+                                }
+                            });
+                        }
+                    });
                 }
             }
         }
     }).observe(document.body, { childList: true, subtree: true });
 
-    function newNodeHandler(node) {
-        node.matches('video') && console.warn('发现新增 video 元素', node);
-        node.querySelectorAll('video').forEach(elem => console.warn('发现新增 video 元素', elem));
-    }
-    
+    // 用法举例
+    observeNewElements('video', el => {
+        console.warn('发现新增 video 元素', el);
+    });
+    observeNewElements('img', el => {
+        console.warn('发现新增 img 元素', el);
+    });
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
