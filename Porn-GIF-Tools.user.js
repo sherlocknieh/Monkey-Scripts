@@ -31,7 +31,7 @@
             this.observer.observe(this.root, { childList: true, subtree: true });
             ElementTracker.instance = this;
         }
-    
+
         _handleMutations(mutationsList) {
             for (const mutation of mutationsList) {
                 for (const node of mutation.addedNodes) {
@@ -52,7 +52,7 @@
                 }
             }
         }
-    
+
         track(selector, callback) {
             this.selectorMap.set(selector, callback);
             this.root.querySelectorAll(selector).forEach(el => {
@@ -64,7 +64,7 @@
             return this;
         }
     }
-    
+
     // 视频追踪与自动操作
     (function handle_video() {
         const tracker = new ElementTracker();
@@ -78,26 +78,11 @@
         });
     })();
 
-    // Greasyfork 与 Sleazyfork 互链
-    (function handle_fork() {
-        const url = window.location.href;
-        const isGreasy = url.includes('greasyfork.org');
-        const target = url.replace(isGreasy ? 'greasyfork' : 'sleazyfork', isGreasy ? 'sleazyfork' : 'greasyfork');
-        const nav = document.querySelector('#site-nav > nav');
-        const li = document.createElement('li');
-        const a = document.createElement('a');
-        a.href = target;
-        a.textContent = isGreasy ? 'SleazyFork' : 'GreasyFork';
-        li.appendChild(a);
-        if (nav.firstChild) nav.insertBefore(li, nav.firstChild);
-        else nav.appendChild(li);
-    })();
-
     // Pornhub 专用功能
     (function handle_pornhub() {
         // 切换GIF静音图标
-        const t = new ElementTracker();
-        t.track('#js-volumeToggle', volBtn => {
+        const tracker = new ElementTracker();
+        tracker.track('#js-volumeToggle', volBtn => {
             console.warn('发现 GIF 静音按钮');
             volBtn.click();
             volBtn.classList.remove('muted');
@@ -139,6 +124,21 @@
                 window.location.replace(newUrl);
             };
         }
+    })();
+
+    // Greasyfork 与 Sleazyfork 互链
+    (function handle_fork() {
+        const url = window.location.href;
+        const isGreasy = url.includes('greasyfork.org');
+        const target = url.replace(isGreasy ? 'greasyfork' : 'sleazyfork', isGreasy ? 'sleazyfork' : 'greasyfork');
+        const nav = document.querySelector('#site-nav > nav');
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        a.href = target;
+        a.textContent = isGreasy ? 'SleazyFork' : 'GreasyFork';
+        li.appendChild(a);
+        if (nav.firstChild) nav.insertBefore(li, nav.firstChild);
+        else nav.appendChild(li);
     })();
 
 })();
