@@ -1,7 +1,7 @@
 // ==UserScript==
 // @namespace   Violentmonkey Scripts
 // @name        调试脚本
-// @version     1.1.6.1
+// @version     2025.11.07.0201
 // @grant       none
 // @match       https://**/*
 // @description 通用调试和代码参考
@@ -23,52 +23,64 @@
         return rawReplace.apply(this, args);
     };
 
-    // 动态新增元素监听器
-    const selectorMap = new Map();    // 选择器-回调映射
-    const seen = new WeakSet();    // 元素去重集合
-    // 监听注册函数
-    function trackElement(selector, callback) {
-        selectorMap.set(selector, callback);
-        // 初始扫描
-        document.querySelectorAll(selector).forEach(el => {
-            if (!seen.has(el)) {
-                seen.add(el);
-                callback(el);
-            }
-        });
-    }
-    // 全局 observer
-    new MutationObserver((mutationsList) => {
-        for (const mutation of mutationsList) {
-            for (const node of mutation.addedNodes) {
-                if (node.nodeType === 1) {
-                    selectorMap.forEach((callback, selector) => {
-                        // 自身匹配
-                        if (node.matches && node.matches(selector) && !seen.has(node)) {
-                            seen.add(node);
-                            callback(node);
-                        }
-                        // 后代匹配
-                        if (node.querySelectorAll) {
-                            node.querySelectorAll(selector).forEach(elem => {
-                                if (!seen.has(elem)) {
-                                    seen.add(elem);
-                                    callback(elem);
-                                }
-                            });
-                        }
-                    });
+    // 元素追踪器
+    class ElementTracker {
+        constructor(root = document.body) {
+            this.selectorMap = new Map();
+            this.seen = new WeakSet();
+            this.root = root;
+            this.observer = new MutationObserver(this._handleMutations.bind(this));
+            this.observer.observe(this.root, { childList: true, subtree: true });
+        }
+
+        track(selector, callback) {
+            this.selectorMap.set(selector, callback);
+            // 初始扫描
+            this.root.querySelectorAll(selector).forEach(el => {
+                if (!this.seen.has(el)) {
+                    this.seen.add(el);
+                    callback(el);
+                }
+            });
+        }
+
+        _handleMutations(mutationsList) {
+            for (const mutation of mutationsList) {
+                for (const node of mutation.addedNodes) {
+                    if (node.nodeType === 1) {
+                        this.selectorMap.forEach((callback, selector) => {
+                            if (node.matches && node.matches(selector) && !this.seen.has(node)) {
+                                this.seen.add(node);
+                                callback(node);
+                            }
+                            if (node.querySelectorAll) {
+                                node.querySelectorAll(selector).forEach(elem => {
+                                    if (!this.seen.has(elem)) {
+                                        this.seen.add(elem);
+                                        callback(elem);
+                                    }
+                                });
+                            }
+                        });
+                    }
                 }
             }
         }
-    }).observe(document.body, { childList: true, subtree: true });
 
+        disconnect() {
+            this.observer.disconnect();
+        }
+    }
     // 用法示例
-    trackElement('video', elem => {
+    const tracker = new ElementTracker();
+    tracker.track('video', elem => {
         console.warn('发现 video 元素', elem);
-        elem.volume = 0.5; // 设置音量为50%
-        elem.muted = false; // 取消静音
+        // elem.volume = 0.5;
+        // elem.muted = false;
     });
+    // tracker.track('img', elem => {
+    //     console.warn('发现 img 元素', elem);
+    // });
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
