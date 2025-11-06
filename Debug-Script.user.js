@@ -3,7 +3,7 @@
 // @namespace   Violentmonkey Scripts
 // @match       https://**/*
 // @grant       none
-// @version     1.1
+// @version     1.1.1
 // @author      -
 // @description 2025/11/5 14:00:22
 // ==/UserScript==
@@ -37,7 +37,7 @@
     }
     
     waitForElement('video', (el) => {
-        console.log('入口：元素出现了', el);
+        console.warn('video 元素出现了', el);
     });
 
 
