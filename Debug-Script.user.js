@@ -3,7 +3,7 @@
 // @namespace   Violentmonkey Scripts
 // @match       https://**/*
 // @grant       none
-// @version     1.0
+// @version     1.1
 // @author      -
 // @description 2025/11/5 14:00:22
 // ==/UserScript==
