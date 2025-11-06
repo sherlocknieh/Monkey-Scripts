@@ -1,7 +1,7 @@
 // ==UserScript==
 // @namespace    Violentmonkey Scripts
 // @name         Porn GIF Tools
-// @version      2025.11.07.0425
+// @version      2025.11.07.0444
 // @grant        none
 // @match        https://greasyfork.org/*
 // @match        https://sleazyfork.org/*
@@ -17,7 +17,7 @@
 // ==/UserScript==
 
 (function main() {
-
+    'use strict';
     // 元素追踪器--单例模式
     class ElementTracker {
         constructor(root = document.body) {
@@ -96,11 +96,11 @@
     // Pornhub 专用功能
     (function handle_pornhub() {
         // 切换GIF静音图标
-        const tracker = new ElementTracker();
-        tracker.track('#js-volumeToggle', volBtn => {
+        const t = new ElementTracker();
+        t.track('#js-volumeToggle', volBtn => {
+            console.warn('发现 GIF 静音按钮');
             volBtn.click();
             volBtn.classList.remove('muted');
-            console.warn('已更新 GIF 静音按钮');
         });
 
         // 替换 pornhub.com 图标
