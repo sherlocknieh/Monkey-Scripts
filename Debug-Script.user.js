@@ -1,7 +1,7 @@
 // ==UserScript==
 // @namespace   Violentmonkey Scripts
 // @name        调试脚本
-// @version     1.1.5
+// @version     1.1.6
 // @grant       none
 // @match       https://**/*
 // @description 通用调试和代码参考
@@ -56,12 +56,9 @@
         }
     }).observe(document.body, { childList: true, subtree: true });
 
-    // 用法举例
+    // 用法示例
     observeNewElements('video', el => {
         console.warn('发现新增 video 元素', el);
-    });
-    observeNewElements('img', el => {
-        console.warn('发现新增 img 元素', el);
     });
 
     if (document.readyState === 'loading') {
