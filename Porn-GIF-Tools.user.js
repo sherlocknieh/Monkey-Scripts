@@ -1,7 +1,8 @@
 // ==UserScript==
-// @namespace    http://tampermonkey.net/
+// @namespace    Violentmonkey Scripts
 // @name         Porn GIF Tools
-// @version      2025.11.06.0203
+// @version      2025.11.07.0006
+// @grant        none
 // @match        https://greasyfork.org/*
 // @match        https://sleazyfork.org/*
 // @match        https://*.pornhub.com/*
@@ -9,8 +10,6 @@
 // @match        https://nsfw.xxx/*
 // @match        https://anacams.com/post/*
 // @match        https://rule34.xxx/*
-// @grant        none
-// @run-at       document-end
 // @description  Greasyfork 和 Sleazyfork 页面互链
 // @description  Pornhub GIF 自动取消静音, GIF 搜索页与 Video 搜索页跳转按钮, Pornhub 标签栏图标替换
 // @description  Musedam 视频自动播放

@@ -1,14 +1,13 @@
 // ==UserScript==
-// @name        调试脚本
 // @namespace   Violentmonkey Scripts
-// @match       https://**/*
+// @name        调试脚本
+// @version     1.1.3
 // @grant       none
-// @version     1.1.1
-// @author      -
-// @description 2025/11/5 14:00:22
+// @match       https://**/*
+// @description 通用调试和代码参考
 // ==/UserScript==
 
-(function () {
+(function main() {
 
     console.warn("调试脚本正在运行")
     console.warn("重定义 pushState 和 replaceState 函数")
@@ -25,19 +24,35 @@
         return rawReplace.apply(this, args);
     };
 
-    function waitForElement(selector, callback) {
-        const observer = new MutationObserver(() => {
-            const elem = document.querySelector(selector);
-            if (elem) {
-                observer.disconnect();
-                callback(elem);
+    function trackElement(selector, callback, onlyOnce = false) {
+        const observer = new MutationObserver((mutationsList) => {
+            // 遍历所有变更记录
+            for (const mutation of mutationsList) {
+                // 遍历所有新增节点
+                for (const node of mutation.addedNodes) {
+                    // 新增的节点本身就是目标元素
+                    if (node.matches && node.matches(selector)) {
+                        if (onlyOnce) {
+                            observer.disconnect();
+                        }
+                        callback(node);
+                    }
+                    // 新增的节点中包含目标元素
+                    const elem = document.querySelector(selector);
+                    if (elem) {
+                        if (onlyOnce) {
+                            observer.disconnect();
+                        }
+                        callback(elem);
+                    }
+                }
             }
         });
         observer.observe(document.body, { childList: true, subtree: true });
     }
     
-    waitForElement('video', (el) => {
-        console.warn('video 元素出现了', el);
+    trackElement('video', (el) => {
+        console.warn('发现新增 video 元素', el);
     });
 
 

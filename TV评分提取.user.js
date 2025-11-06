@@ -1,8 +1,8 @@
 // ==UserScript==
-// @namespace    http://tampermonkey.net/
+// @namespace    Violentmonkey Scripts
 // @name         剧集信息提取器
 // @grant        none
-// @version      2.0
+// @version      2.1
 // @description  提取 IMDb, Trakt.tv 剧集页面的剧集信息
 // @match        https://*.imdb.com/title/*/episodes*
 // @match        https://trakt.tv/shows/*/seasons/*
