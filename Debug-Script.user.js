@@ -1,7 +1,7 @@
 // ==UserScript==
 // @namespace   Violentmonkey Scripts
 // @name        调试脚本
-// @version     1.1.6
+// @version     1.1.6.1
 // @grant       none
 // @match       https://**/*
 // @description 通用调试和代码参考
@@ -27,8 +27,15 @@
     const selectorMap = new Map();    // 选择器-回调映射
     const seen = new WeakSet();    // 元素去重集合
     // 监听注册函数
-    function observeNewElements(selector, callback) {
+    function trackElement(selector, callback) {
         selectorMap.set(selector, callback);
+        // 初始扫描
+        document.querySelectorAll(selector).forEach(el => {
+            if (!seen.has(el)) {
+                seen.add(el);
+                callback(el);
+            }
+        });
     }
     // 全局 observer
     new MutationObserver((mutationsList) => {
@@ -57,8 +64,10 @@
     }).observe(document.body, { childList: true, subtree: true });
 
     // 用法示例
-    observeNewElements('video', el => {
-        console.warn('发现新增 video 元素', el);
+    trackElement('video', elem => {
+        console.warn('发现 video 元素', elem);
+        elem.volume = 0.5; // 设置音量为50%
+        elem.muted = false; // 取消静音
     });
 
     if (document.readyState === 'loading') {
