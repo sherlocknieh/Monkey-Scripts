@@ -24,7 +24,22 @@
         console.warn('发生路由跳转 \n新URL: ', args[2], '\n覆盖历史记录');
         return rawReplace.apply(this, args);
     };
+
+    function waitForElement(selector, callback) {
+        const observer = new MutationObserver(() => {
+            const elem = document.querySelector(selector);
+            if (elem) {
+                observer.disconnect();
+                callback(elem);
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
     
+    waitForElement('video', (el) => {
+        console.log('入口：元素出现了', el);
+    });
+
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
