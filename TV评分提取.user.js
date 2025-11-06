@@ -9,7 +9,7 @@
 // @exclude      https://trakt.tv/shows/*/seasons/*/episodes/*
 // ==/UserScript==
 
-(function() {
+(function main() {
     'use strict';
 
     let episodes = [];

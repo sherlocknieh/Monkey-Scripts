@@ -1,7 +1,7 @@
 // ==UserScript==
 // @namespace   Violentmonkey Scripts
 // @name        调试脚本
-// @version     1.1.3
+// @version     1.1.4
 // @grant       none
 // @match       https://**/*
 // @description 通用调试和代码参考
@@ -10,51 +10,38 @@
 (function main() {
 
     console.warn("调试脚本正在运行")
-    console.warn("重定义 pushState 和 replaceState 函数")
 
+    console.warn("重定义 pushState 和 replaceState 函数")
     const rawPush = history.pushState;
     history.pushState = function (...args) {
         console.warn('发生路由跳转 \n新URL: ', args[2], ' \n保留历史记录');
         return rawPush.apply(this, args);
     };
-
     const rawReplace = history.replaceState;
     history.replaceState = function (...args) {
         console.warn('发生路由跳转 \n新URL: ', args[2], '\n覆盖历史记录');
         return rawReplace.apply(this, args);
     };
 
-    function trackElement(selector, callback, onlyOnce = false) {
-        const observer = new MutationObserver((mutationsList) => {
-            // 遍历所有变更记录
-            for (const mutation of mutationsList) {
-                // 遍历所有新增节点
-                for (const node of mutation.addedNodes) {
-                    // 新增的节点本身就是目标元素
-                    if (node.matches && node.matches(selector)) {
-                        if (onlyOnce) {
-                            observer.disconnect();
-                        }
-                        callback(node);
-                    }
-                    // 新增的节点中包含目标元素
-                    const elem = document.querySelector(selector);
-                    if (elem) {
-                        if (onlyOnce) {
-                            observer.disconnect();
-                        }
-                        callback(elem);
-                    }
+    // 动态新增元素监听器
+    new MutationObserver((mutationsList) => {
+        // 遍历所有变更记录
+        for (const mutation of mutationsList) {
+            // 遍历所有新增节点
+            for (const node of mutation.addedNodes) {
+                // 排除非 HTMLElement 节点
+                if (node.nodeType === 1) {
+                    newNodeHandler(node);
                 }
             }
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
+        }
+    }).observe(document.body, { childList: true, subtree: true });
+
+    function newNodeHandler(node) {
+        node.matches('video') && console.warn('发现新增 video 元素', node);
+        node.querySelectorAll('video').forEach(elem => console.warn('发现新增 video 元素', elem));
     }
     
-    trackElement('video', (el) => {
-        console.warn('发现新增 video 元素', el);
-    });
-
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
