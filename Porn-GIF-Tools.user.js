@@ -1,7 +1,7 @@
 // ==UserScript==
 // @namespace    Violentmonkey Scripts
 // @name         Porn GIF Tools
-// @version      2025.11.07.0340
+// @version      2025.11.07.0425
 // @grant        none
 // @match        https://greasyfork.org/*
 // @match        https://sleazyfork.org/*
@@ -10,15 +10,15 @@
 // @match        https://nsfw.xxx/*
 // @match        https://anacams.com/post/*
 // @match        https://rule34.xxx/*
-// @description  Greasyfork 和 Sleazyfork 页面互链
-// @description  Pornhub GIF 自动取消静音, GIF 搜索页与 Video 搜索页跳转按钮, Pornhub 标签栏图标替换
+// @description  视频自动取消静音
 // @description  Musedam 视频自动播放
-// @description  视频自动取消静音-通用版
+// @description  Pornhub 标签栏图标替换, GIF 搜索页与 Video 搜索页跳转按钮
+// @description  Greasyfork 和 Sleazyfork 页面互链
 // ==/UserScript==
 
 (function main() {
 
-    // 元素追踪器
+    // 元素追踪器--单例模式
     class ElementTracker {
         constructor(root = document.body) {
             if (ElementTracker.instance) {
@@ -30,17 +30,6 @@
             this.observer = new MutationObserver(this._handleMutations.bind(this));
             this.observer.observe(this.root, { childList: true, subtree: true });
             ElementTracker.instance = this;
-        }
-    
-        track(selector, callback) {
-            this.selectorMap.set(selector, callback);
-            this.root.querySelectorAll(selector).forEach(el => {
-                if (!this.seen.has(el)) {
-                    this.seen.add(el);
-                    callback(el);
-                }
-            });
-            return this;
         }
     
         _handleMutations(mutationsList) {
@@ -64,28 +53,34 @@
             }
         }
     
-        disconnect() {
-            this.observer.disconnect();
+        track(selector, callback) {
+            this.selectorMap.set(selector, callback);
+            this.root.querySelectorAll(selector).forEach(el => {
+                if (!this.seen.has(el)) {
+                    this.seen.add(el);
+                    callback(el);
+                }
+            });
+            return this;
         }
     }
     
-    // 视频自动取消静音-通用版
-    const tracker = new ElementTracker();
-    tracker.track('video', elem => {
-        console.warn('发现 video 元素', elem);
-        elem.volume = 0.5;
-        elem.muted = false;
-        console.warn('已取消静音');
-    });
+    // 视频追踪与自动操作
+    (function handle_video() {
+        const tracker = new ElementTracker();
+        tracker.track('video', v => {
+            console.warn('发现 video 元素', v);
+            v.volume = 0.5;
+            v.muted = false;
+            console.warn('已取消静音');
+            // Musedam 视频自动播放
+            if ((window.location.href).includes('musedam.cc')) v.play();
+        });
+    })();
 
-    
-    const url = window.location.href;
-    if (url.includes('fork.org')) handle_fork();
-    else if (url.includes('pornhub.com')) handle_pornhub();
-    else if (url.includes('musedam.cc')) handle_musedam();
-
-
-    function handle_fork() {
+    // Greasyfork 与 Sleazyfork 互链
+    (function handle_fork() {
+        const url = window.location.href;
         const isGreasy = url.includes('greasyfork.org');
         const target = url.replace(isGreasy ? 'greasyfork' : 'sleazyfork', isGreasy ? 'sleazyfork' : 'greasyfork');
         const nav = document.querySelector('#site-nav > nav');
@@ -96,27 +91,17 @@
         li.appendChild(a);
         if (nav.firstChild) nav.insertBefore(li, nav.firstChild);
         else nav.appendChild(li);
-    }
+    })();
 
-    function handle_pornhub() {
-        // 取消GIF静音
-        const unmute = () => {
-            // console.log('正在取消GIF静音');
-            // const gifWebmPlayer = document.getElementById('gifWebmPlayer');
-            // if (gifWebmPlayer) {
-            //     gifWebmPlayer.muted = false;
-            //     gifWebmPlayer.volume = 0.5;
-            // } else {
-            //     console.log('未发现 gifWebmPlayer 元素');
-            // }
-            const volumeToggle = document.getElementById('js-volumeToggle');
-            if (volumeToggle && volumeToggle.classList.contains('muted')) {
-                volumeToggle.click();
-                volumeToggle.classList.remove('muted');
-            }
-        };
-        window.addEventListener('load', () => setTimeout(unmute, 500));
-        document.addEventListener('visibilitychange', () => !document.hidden && unmute());
+    // Pornhub 专用功能
+    (function handle_pornhub() {
+        // 切换GIF静音图标
+        const tracker = new ElementTracker();
+        tracker.track('#js-volumeToggle', volBtn => {
+            volBtn.click();
+            volBtn.classList.remove('muted');
+            console.warn('已更新 GIF 静音按钮');
+        });
 
         // 替换 pornhub.com 图标
         document.querySelectorAll('link[rel*="icon"]').forEach(link => {
@@ -129,6 +114,7 @@
         });
 
         // GIF 搜索页与 video 搜索页互转按钮
+        const url = window.location.href;
         if (url.includes('search')) {
             const isVideo = url.includes('video/search');
             const button = document.createElement('button');
@@ -153,42 +139,6 @@
                 window.location.replace(newUrl);
             };
         }
-    }
+    })();
 
-    function handle_musedam() {
-
-        // 实现单页应用的路由事件监听
-        const rawPush = history.pushState;
-        history.pushState = function (...args) {
-            window.dispatchEvent(new Event('locationchange'));  // 触发自定义事件
-            return rawPush.apply(this, args);                   // 调用原始函数
-        };
-
-        const rawReplace = history.replaceState;
-        history.replaceState = function (...args) {
-            window.dispatchEvent(new Event('locationchange'));  // 触发自定义事件
-            return rawReplace.apply(this, args);                // 调用原始函数
-        };
-
-        // 视频播放逻辑
-        const autoPlayVideo = () => {
-            setTimeout(() => { // 延时等待新页面加载
-                const currentPath = location.pathname;
-                if (currentPath.includes('/detail')) {
-                    console.warn('已进入视频页面，尝试自动播放视频');
-                    const v = document.querySelector('video');
-                    if (!v) {
-                    console.warn('未捕获到 video 元素');
-                    return false;
-                }
-                v.play();
-                console.warn('已触发视频播放');
-            }}, 500);
-        };
-
-        // 路由发生变化时触发
-        window.addEventListener('locationchange', autoPlayVideo);
-        // 页面切回前台时触发
-        document.addEventListener('visibilitychange', () => { if (!document.hidden) autoPlayVideo(); });
-    }
 })();
