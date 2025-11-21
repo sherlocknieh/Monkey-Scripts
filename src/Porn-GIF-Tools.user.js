@@ -1,8 +1,7 @@
 // ==UserScript==
 // @namespace    Violentmonkey Scripts
 // @name         Porn GIF Tools
-// @version      2025.11.07.0444
-// @grant        none
+// @version      2025.11.21.2200
 // @match        https://greasyfork.org/*
 // @match        https://sleazyfork.org/*
 // @match        https://*.pornhub.com/*
@@ -15,6 +14,7 @@
 // @description  Musedam 视频自动播放
 // @description  Pornhub 标签栏图标替换, GIF 搜索页与 Video 搜索页跳转按钮
 // @description  Greasyfork 和 Sleazyfork 页面互链
+// @grant        none
 // ==/UserScript==
 
 (function main() {

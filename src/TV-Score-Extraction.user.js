@@ -1,12 +1,12 @@
 // ==UserScript==
 // @namespace    Violentmonkey Scripts
 // @name         TV评分提取器
-// @grant        none
-// @version      1.1
-// @description  在 IMDb, Trakt.tv 剧集列表页提取各集信息
+// @version      2025.11.21.2200
 // @match        https://*.imdb.com/title/*/episodes*
 // @match        https://trakt.tv/shows/*/seasons/*
 // @exclude      https://trakt.tv/shows/*/seasons/*/episodes/*
+// @description  在 IMDb, Trakt.tv 剧集列表页提取各集信息
+// @grant        none
 // ==/UserScript==
 
 (function() {
