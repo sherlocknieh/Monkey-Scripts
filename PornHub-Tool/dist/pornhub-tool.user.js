@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         pornhub-tool
 // @namespace    npm/vite-plugin-monkey
-// @version      2026.11.21.2200
+// @version      2026.9.3.2300
 // @description  视频自动取消静音, Pornhub 标签栏图标替换, GIF 搜索页与 Video 搜索页跳转按钮, Musedam 视频自动播放, Greasyfork 和 Sleazyfork 页面互链
 // @icon         https://vitejs.dev/logo.svg
 // @match        https://greasyfork.org/*

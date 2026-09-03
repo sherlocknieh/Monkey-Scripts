@@ -1,5 +1,5 @@
 
-
+// 动态元素追踪器
 class ElementTracker {
     constructor() {
         // 单例模式
@@ -16,6 +16,7 @@ class ElementTracker {
         // 开始监听
         this.observer.observe(this.root, { childList: true, subtree: true });
     }
+
     // 添加追踪规则
     track(selector, callback) {
         // 添加到追踪列表
@@ -55,7 +56,7 @@ class ElementTracker {
         }
     }
 
-}   
+}
 
 // 视频元素处理
 (function handle_video() {
@@ -119,63 +120,43 @@ class ElementTracker {
     }
 
     // GIF 链接提取按钮
-    (function() {
-        const wrappers = document.querySelectorAll('div[data-gif]');
-        let count = 0;
-        
-        wrappers.forEach(wrapper => {
-            // 避免重复添加
-            if (wrapper.parentElement.querySelector('.custom-gif-link-btn')) return;
-        
-            const gifUrl = wrapper.getAttribute('data-gif');
-            if (!gifUrl) return;
-        
-            const container = wrapper.parentElement;
-            
-            // 确保容器是定位上下文
-            if (window.getComputedStyle(container).position === 'static') {
-            container.style.position = 'relative';
-            }
-        
-            const btn = document.createElement('a');
-            btn.href = gifUrl;
-            btn.target = '_blank';
-            btn.innerText = 'GIF';
-            btn.className = 'custom-gif-link-btn';
-            
-            // 整合所有修正后的样式：
-            // 1. 宽度设为 auto 解决拉伸问题
-            // 2. 使用半透明黑色背景
-            // 3. 绝对定位在右下角
-            Object.assign(btn.style, {
+    const phTracker = new ElementTracker();
+    phTracker.track('div[data-gif]', wrapper => {
+        // 避免重复添加按钮
+        if (wrapper.querySelector('.custom-gif-link-btn')) return;
+        // 获取 GIF 链接
+        const gifUrl = wrapper.getAttribute('data-gif');
+        if (!gifUrl) return;
+
+        // 创建按钮
+        const btn = document.createElement('a');
+        btn.href = gifUrl;
+        btn.target = '_blank';
+        btn.innerText = 'GIF';
+        btn.className = 'custom-gif-link-btn';
+
+        // 最小化样式干扰
+        Object.assign(btn.style, {
             position: 'absolute',
-            right: '5px',
+            right: '2px',
             bottom: '2px',
-            backgroundColor: 'rgba(0, 0, 0, 0.6)',
-            color: '#ffffff',
-            padding: '3px 3px',
-            borderRadius: '5px',
-            fontSize: '10px',
-            fontWeight: 'bold',
-            textDecoration: 'none',
-            fontFamily: 'Arial, sans-serif',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
             width: 'auto',
-            left: 'auto',
-            display: 'inline-block',
-            backdropFilter: 'blur(2px)',
-            boxSizing: 'border-box'
-            });
-        
-            btn.onmouseover = () => btn.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-            btn.onmouseout = () => btn.style.backgroundColor = 'rgba(0, 0, 0, 0.6)';
-        
-            container.appendChild(btn);
-            count++;
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            color: '#fff',
+            padding: '2px 4px',
+            borderRadius: '3px',
+            fontSize: '10px',
+            zIndex: '10', // 确保在图片上层但不过高
+            pointerEvents: 'auto'
         });
-        
-        console.log(`已成功添加 ${count} 个半透明 GIF 下载按钮。`);
-        })();
+
+        // 获取父级容器
+        const container = wrapper.parentElement;
+        // 父级设置 relative 定位会导致图片加载失败, 所以不设置
+        // container.style.position = 'relative';
+        // 添加按钮到父级容器
+        container.appendChild(btn);
+    });
 
 })();
 
