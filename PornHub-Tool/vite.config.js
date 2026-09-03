@@ -19,6 +19,7 @@ export default defineConfig({
           'https://anacams.com/post/*',
           'https://www.sex.com/*/gifs/*'
         ],
+        grant: 'none',
         description: '视频自动取消静音, Pornhub 标签栏图标替换, GIF 搜索页与 Video 搜索页跳转按钮, Musedam 视频自动播放, Greasyfork 和 Sleazyfork 页面互链',
       },
     }),

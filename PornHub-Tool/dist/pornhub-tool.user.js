@@ -12,6 +12,7 @@
 // @match        https://rule34.xxx/*
 // @match        https://anacams.com/post/*
 // @match        https://www.sex.com/*/gifs/*
+// @grant        none
 // ==/UserScript==
 
 (function() {
