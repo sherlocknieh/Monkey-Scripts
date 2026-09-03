@@ -1,9 +1,17 @@
 // ==UserScript==
-// @name       pornhub-tool
-// @namespace  npm/vite-plugin-monkey
-// @version    0.0.0
-// @icon       https://vitejs.dev/logo.svg
-// @match      http*://*/*
+// @name         pornhub-tool
+// @namespace    npm/vite-plugin-monkey
+// @version      2026.11.21.2200
+// @description  视频自动取消静音, Pornhub 标签栏图标替换, GIF 搜索页与 Video 搜索页跳转按钮, Musedam 视频自动播放, Greasyfork 和 Sleazyfork 页面互链
+// @icon         https://vitejs.dev/logo.svg
+// @match        https://greasyfork.org/*
+// @match        https://sleazyfork.org/*
+// @match        https://*.pornhub.com/*
+// @match        https://musedam.cc/*
+// @match        https://nsfw.xxx/*
+// @match        https://rule34.xxx/*
+// @match        https://anacams.com/post/*
+// @match        https://www.sex.com/*/gifs/*
 // ==/UserScript==
 
 (function() {
