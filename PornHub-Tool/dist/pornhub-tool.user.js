@@ -67,10 +67,10 @@
 		if (!url.includes("pornhub.com")) return;
 		document.querySelectorAll("link[rel*=\"icon\"]").forEach((link) => {
 			link.href = "data:image/svg+xml;base64," + btoa(`
-            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
-                <circle cx="32" cy="32" r="32" fill="black"/>
-                <text x="32" y="42" text-anchor="middle" font-size="32" fill="white">PH</text>
-            </svg>`);
+        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
+            <circle cx="32" cy="32" r="32" fill="black"/>
+            <text x="32" y="42" text-anchor="middle" font-size="32" fill="white">PH</text>
+        </svg>`);
 			link.type = "image/svg+xml";
 		});
 		new ElementTracker().track("#js-volumeToggle", (volBtn) => {
@@ -100,46 +100,30 @@
 			};
 			document.body.appendChild(button);
 		}
-		(function() {
-			const wrappers = document.querySelectorAll("div[data-gif]");
-			let count = 0;
-			wrappers.forEach((wrapper) => {
-				if (wrapper.parentElement.querySelector(".custom-gif-link-btn")) return;
-				const gifUrl = wrapper.getAttribute("data-gif");
-				if (!gifUrl) return;
-				const container = wrapper.parentElement;
-				if (window.getComputedStyle(container).position === "static") container.style.position = "relative";
-				const btn = document.createElement("a");
-				btn.href = gifUrl;
-				btn.target = "_blank";
-				btn.innerText = "GIF";
-				btn.className = "custom-gif-link-btn";
-				Object.assign(btn.style, {
-					position: "absolute",
-					right: "5px",
-					bottom: "2px",
-					backgroundColor: "rgba(0, 0, 0, 0.6)",
-					color: "#ffffff",
-					padding: "3px 3px",
-					borderRadius: "5px",
-					fontSize: "10px",
-					fontWeight: "bold",
-					textDecoration: "none",
-					fontFamily: "Arial, sans-serif",
-					border: "1px solid rgba(255, 255, 255, 0.2)",
-					width: "auto",
-					left: "auto",
-					display: "inline-block",
-					backdropFilter: "blur(2px)",
-					boxSizing: "border-box"
-				});
-				btn.onmouseover = () => btn.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
-				btn.onmouseout = () => btn.style.backgroundColor = "rgba(0, 0, 0, 0.6)";
-				container.appendChild(btn);
-				count++;
+		new ElementTracker().track("div[data-gif]", (wrapper) => {
+			if (wrapper.querySelector(".custom-gif-link-btn")) return;
+			const gifUrl = wrapper.getAttribute("data-gif");
+			if (!gifUrl) return;
+			const btn = document.createElement("a");
+			btn.href = gifUrl;
+			btn.target = "_blank";
+			btn.innerText = "GIF";
+			btn.className = "custom-gif-link-btn";
+			Object.assign(btn.style, {
+				position: "absolute",
+				right: "2px",
+				bottom: "2px",
+				width: "auto",
+				backgroundColor: "rgba(0, 0, 0, 0.6)",
+				color: "#fff",
+				padding: "2px 4px",
+				borderRadius: "3px",
+				fontSize: "10px",
+				zIndex: "10",
+				pointerEvents: "auto"
 			});
-			console.log(`已成功添加 ${count} 个半透明 GIF 下载按钮。`);
-		})();
+			wrapper.parentElement.appendChild(btn);
+		});
 	})();
 	(function handle_sexcom() {
 		if (!window.location.href.includes("sex.com")) return;
