@@ -94,10 +94,27 @@ class ElementTracker {
     });
 
     // GIF 搜索页与 Video 搜索页互转按钮
+    const pageUrl = new URL(url);
     if (url.includes('search')) {
-        const isVideo = url.includes('video/search');
-        const button = document.createElement('button');
-        button.textContent = isVideo ? 'GIF' : 'Video';
+        // 修正官方的错误链接（video?search 或 gif?search）
+        const pageType = pageUrl.pathname.match(/^\/(video|gif|gifs)$/)?.[1];
+        if (pageType) {
+            pageUrl.pathname = `/${pageType}/search`;
+            window.location.replace(pageUrl.href);
+            return;
+        }
+
+        const isVideo = pageUrl.pathname.startsWith('/video');
+        const targetType = isVideo ? 'gif' : 'video';
+        pageUrl.pathname = `/${targetType}/search`;
+        
+        // 创建按钮
+        const button = document.createElement('a');
+        button.textContent = isVideo ? 'ToGIF' : 'ToVideo';
+        button.href = pageUrl.href;
+        // button.target = '_blank'; // 新标签页打开
+
+        // 设置按钮样式
         Object.assign(button.style, {
             position: 'fixed',
             bottom: '20px',
@@ -109,25 +126,21 @@ class ElementTracker {
             border: 'none',
             borderRadius: '999px', // 药丸形状
             cursor: 'pointer',
-            fontSize: '12px',
+            fontSize: '14px',
             boxShadow: '0 2px 5px rgba(0,0,0,0.3)'
         });
-        button.onclick = () => {
-            const newUrl = isVideo ? url.replace('video', 'gifs') : url.replace('gifs', 'video');
-            window.location.replace(newUrl);
-        };
+        // 挂载按钮到 body
         document.body.appendChild(button);
     }
 
     // GIF 链接提取按钮
     const phTracker = new ElementTracker();
+    // 追踪含有 data-gif 属性的 div 元素
     phTracker.track('div[data-gif]', wrapper => {
         // 避免重复添加按钮
         if (wrapper.querySelector('.custom-gif-link-btn')) return;
-        // 获取 GIF 链接
+        // 获取链接
         const gifUrl = wrapper.getAttribute('data-gif');
-        if (!gifUrl) return;
-
         // 创建按钮
         const btn = document.createElement('a');
         btn.href = gifUrl;
@@ -135,7 +148,7 @@ class ElementTracker {
         btn.innerText = 'GIF';
         btn.className = 'custom-gif-link-btn';
 
-        // 最小化样式干扰
+        // 设置按钮样式
         Object.assign(btn.style, {
             position: 'absolute',
             right: '2px',
@@ -145,16 +158,14 @@ class ElementTracker {
             color: '#fff',
             padding: '2px 4px',
             borderRadius: '3px',
-            fontSize: '10px',
+            fontSize: '12px',
             zIndex: '10', // 确保在图片上层但不过高
             pointerEvents: 'auto'
         });
 
         // 获取父级容器
         const container = wrapper.parentElement;
-        // 父级设置 relative 定位会导致图片加载失败, 所以不设置
-        // container.style.position = 'relative';
-        // 添加按钮到父级容器
+        // 挂载按钮到父级容器
         container.appendChild(btn);
     });
 
