@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         pornhub-tool
 // @namespace    npm/vite-plugin-monkey
-// @version      2026.9.3.2300
+// @version      2026.9.5.1700
 // @description  视频自动取消静音, Pornhub 标签栏图标替换, GIF 搜索页与 Video 搜索页跳转按钮, Musedam 视频自动播放, Greasyfork 和 Sleazyfork 页面互链
 // @icon         https://vitejs.dev/logo.svg
 // @match        https://greasyfork.org/*
@@ -76,10 +76,19 @@
 		new ElementTracker().track("#js-volumeToggle", (volBtn) => {
 			volBtn.classList.remove("muted");
 		});
+		const pageUrl = new URL(url);
 		if (url.includes("search")) {
-			const isVideo = url.includes("video/search");
-			const button = document.createElement("button");
-			button.textContent = isVideo ? "GIF" : "Video";
+			const pageType = pageUrl.pathname.match(/^\/(video|gif|gifs)$/)?.[1];
+			if (pageType) {
+				pageUrl.pathname = `/${pageType}/search`;
+				window.location.replace(pageUrl.href);
+				return;
+			}
+			const isVideo = pageUrl.pathname.startsWith("/video");
+			pageUrl.pathname = `/${isVideo ? "gif" : "video"}/search`;
+			const button = document.createElement("a");
+			button.textContent = isVideo ? "ToGIF" : "ToVideo";
+			button.href = pageUrl.href;
 			Object.assign(button.style, {
 				position: "fixed",
 				bottom: "20px",
@@ -91,19 +100,14 @@
 				border: "none",
 				borderRadius: "999px",
 				cursor: "pointer",
-				fontSize: "12px",
+				fontSize: "14px",
 				boxShadow: "0 2px 5px rgba(0,0,0,0.3)"
 			});
-			button.onclick = () => {
-				const newUrl = isVideo ? url.replace("video", "gifs") : url.replace("gifs", "video");
-				window.location.replace(newUrl);
-			};
 			document.body.appendChild(button);
 		}
 		new ElementTracker().track("div[data-gif]", (wrapper) => {
 			if (wrapper.querySelector(".custom-gif-link-btn")) return;
 			const gifUrl = wrapper.getAttribute("data-gif");
-			if (!gifUrl) return;
 			const btn = document.createElement("a");
 			btn.href = gifUrl;
 			btn.target = "_blank";
@@ -118,7 +122,7 @@
 				color: "#fff",
 				padding: "2px 4px",
 				borderRadius: "3px",
-				fontSize: "10px",
+				fontSize: "12px",
 				zIndex: "10",
 				pointerEvents: "auto"
 			});
