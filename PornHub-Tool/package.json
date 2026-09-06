@@ -1,7 +1,7 @@
 {
   "name": "pornhub-tool",
   "private": true,
-  "version": "2026.9.7.0001",
+  "version": "2026.9.7.0244",
   "type": "module",
   "scripts": {
     "dev": "vite",

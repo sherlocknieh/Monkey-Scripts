@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         pornhub-tool
 // @namespace    npm/vite-plugin-monkey
-// @version      2026.9.7.0001
+// @version      2026.9.7.0244
 // @description  视频自动取消静音, Pornhub 标签栏图标替换, GIF 搜索页与 Video 搜索页跳转按钮, Musedam 视频自动播放, Greasyfork 和 Sleazyfork 页面互链
 // @icon         https://vitejs.dev/logo.svg
 // @match        https://greasyfork.org/*
@@ -105,7 +105,9 @@
 			const swapTitleText = btn ? btn.querySelector(".swapTitle") : null;
 			if (window.VIDEO_SHOW && window.VIDEO_SHOW.videoTitleOriginal && titleSpan) {
 				const targetTitle = window.VIDEO_SHOW.videoTitleOriginal.trim();
-				if (titleSpan.innerHTML.trim() !== targetTitle) {
+				const currentTitle = titleSpan.innerHTML.trim();
+				document.title = targetTitle;
+				if (currentTitle !== targetTitle) {
 					titleSpan.innerHTML = targetTitle;
 					window.titleWrapper = titleSpan;
 					if (btn) btn.classList.add("original");

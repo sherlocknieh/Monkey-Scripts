@@ -139,7 +139,8 @@ class ElementTracker {
         if (window.VIDEO_SHOW && window.VIDEO_SHOW.videoTitleOriginal && titleSpan) {
             const targetTitle = window.VIDEO_SHOW.videoTitleOriginal.trim();
             const currentTitle = titleSpan.innerHTML.trim();
-
+            // 修改网页标题
+            document.title = targetTitle;
             // 核心：当标题内容不等于原标题时强行替换
             if (currentTitle !== targetTitle) {
                 // A. 替换 DOM 渲染文本
