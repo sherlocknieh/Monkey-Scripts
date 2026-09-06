@@ -77,6 +77,24 @@ class ElementTracker {
     const url = window.location.href;
     if (!url.includes('pornhub.com')) return;
 
+    // Pornhub 后台不暂停视频
+    (function no_pause_on_background() {
+        Object.defineProperty(document, 'hidden', { get: () => false });
+        Object.defineProperty(document, 'visibilityState', { get: () => 'visible' });
+
+        const _add = EventTarget.prototype.addEventListener;
+        EventTarget.prototype.addEventListener = function (type, fn, opt) {
+            if (type === 'visibilitychange') return;
+            return _add.call(this, type, fn, opt);
+        };
+
+        const _pause = HTMLMediaElement.prototype.pause;
+        HTMLMediaElement.prototype.pause = function () {
+            if (document.hidden) return;
+            return _pause.apply(this, arguments);
+        };
+    })();
+
     // 替换 pornhub.com 图标
     document.querySelectorAll('link[rel*="icon"]').forEach(link => {
         link.href = 'data:image/svg+xml;base64,' + btoa(`
@@ -107,7 +125,7 @@ class ElementTracker {
         const isVideo = pageUrl.pathname.startsWith('/video');
         const targetType = isVideo ? 'gif' : 'video';
         pageUrl.pathname = `/${targetType}/search`;
-        
+
         // 创建按钮
         const button = document.createElement('a');
         button.textContent = isVideo ? 'ToGIF' : 'ToVideo';
