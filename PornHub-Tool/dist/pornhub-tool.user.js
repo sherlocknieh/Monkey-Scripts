@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         pornhub-tool
 // @namespace    npm/vite-plugin-monkey
-// @version      2026.9.7.0000
+// @version      2026.9.7.0001
 // @description  视频自动取消静音, Pornhub 标签栏图标替换, GIF 搜索页与 Video 搜索页跳转按钮, Musedam 视频自动播放, Greasyfork 和 Sleazyfork 页面互链
 // @icon         https://vitejs.dev/logo.svg
 // @match        https://greasyfork.org/*
@@ -87,6 +87,14 @@
             <text x="32" y="42" text-anchor="middle" font-size="32" fill="white">PH</text>
         </svg>`);
 			link.type = "image/svg+xml";
+		});
+		phTracker.track(".modalMTubes.ageDisclaimer", (modal) => {
+			const enterBtn = modal.querySelector(".buttonOver18, .js-closeAgeModal");
+			if (enterBtn) enterBtn.click();
+			modal.style.display = "none";
+			modal.remove();
+			document.body.style.overflow = "auto";
+			document.documentElement.style.overflow = "auto";
 		});
 		phTracker.track("#js-volumeToggle", (volBtn) => {
 			volBtn.classList.remove("muted");

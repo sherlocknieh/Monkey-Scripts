@@ -107,6 +107,23 @@ class ElementTracker {
         link.type = 'image/svg+xml';
     });
 
+    // 跳过年龄验证弹窗
+    phTracker.track('.modalMTubes.ageDisclaimer', (modal) => {
+        // 1. 尝试触发原生的进入按钮事件（会自动写入站点的 18+ Cookie）
+        const enterBtn = modal.querySelector('.buttonOver18, .js-closeAgeModal');
+        if (enterBtn) {
+            enterBtn.click();
+        }
+
+        // 2. 强行隐藏并移除弹窗节点
+        modal.style.display = 'none';
+        modal.remove();
+
+        // 3. 恢复页面可能被锁定的滚动条
+        document.body.style.overflow = 'auto';
+        document.documentElement.style.overflow = 'auto';
+    });
+
     // 切换GIF静音图标
     phTracker.track('#js-volumeToggle', volBtn => {
         volBtn.classList.remove('muted');
