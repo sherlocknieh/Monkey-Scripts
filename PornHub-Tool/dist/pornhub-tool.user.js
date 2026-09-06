@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         pornhub-tool
 // @namespace    npm/vite-plugin-monkey
-// @version      2026.9.5.1700
+// @version      2026.9.6.1800
 // @description  视频自动取消静音, Pornhub 标签栏图标替换, GIF 搜索页与 Video 搜索页跳转按钮, Musedam 视频自动播放, Greasyfork 和 Sleazyfork 页面互链
 // @icon         https://vitejs.dev/logo.svg
 // @match        https://greasyfork.org/*
@@ -65,6 +65,20 @@
 	(function handle_pornhub() {
 		const url = window.location.href;
 		if (!url.includes("pornhub.com")) return;
+		(function no_pause_on_background() {
+			Object.defineProperty(document, "hidden", { get: () => false });
+			Object.defineProperty(document, "visibilityState", { get: () => "visible" });
+			const _add = EventTarget.prototype.addEventListener;
+			EventTarget.prototype.addEventListener = function(type, fn, opt) {
+				if (type === "visibilitychange") return;
+				return _add.call(this, type, fn, opt);
+			};
+			const _pause = HTMLMediaElement.prototype.pause;
+			HTMLMediaElement.prototype.pause = function() {
+				if (document.hidden) return;
+				return _pause.apply(this, arguments);
+			};
+		})();
 		document.querySelectorAll("link[rel*=\"icon\"]").forEach((link) => {
 			link.href = "data:image/svg+xml;base64," + btoa(`
         <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
