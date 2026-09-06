@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         pornhub-tool
 // @namespace    npm/vite-plugin-monkey
-// @version      2026.9.6.1800
+// @version      2026.9.7.0000
 // @description  视频自动取消静音, Pornhub 标签栏图标替换, GIF 搜索页与 Video 搜索页跳转按钮, Musedam 视频自动播放, Greasyfork 和 Sleazyfork 页面互链
 // @icon         https://vitejs.dev/logo.svg
 // @match        https://greasyfork.org/*
@@ -65,6 +65,7 @@
 	(function handle_pornhub() {
 		const url = window.location.href;
 		if (!url.includes("pornhub.com")) return;
+		const phTracker = new ElementTracker();
 		(function no_pause_on_background() {
 			Object.defineProperty(document, "hidden", { get: () => false });
 			Object.defineProperty(document, "visibilityState", { get: () => "visible" });
@@ -87,11 +88,48 @@
         </svg>`);
 			link.type = "image/svg+xml";
 		});
-		new ElementTracker().track("#js-volumeToggle", (volBtn) => {
+		phTracker.track("#js-volumeToggle", (volBtn) => {
 			volBtn.classList.remove("muted");
 		});
-		const pageUrl = new URL(url);
+		phTracker.track(".title-container, .headerWrap", (container) => {
+			const titleSpan = container.querySelector("h1 .inlineFree") || container.querySelector(".inlineFree");
+			const btn = container.querySelector(".js-originalTranslation");
+			const swapTitleText = btn ? btn.querySelector(".swapTitle") : null;
+			if (window.VIDEO_SHOW && window.VIDEO_SHOW.videoTitleOriginal && titleSpan) {
+				const targetTitle = window.VIDEO_SHOW.videoTitleOriginal.trim();
+				if (titleSpan.innerHTML.trim() !== targetTitle) {
+					titleSpan.innerHTML = targetTitle;
+					window.titleWrapper = titleSpan;
+					if (btn) btn.classList.add("original");
+					if (swapTitleText) swapTitleText.textContent = window.VIDEO_SHOW.seeTranslatedTitle || "查看翻译标题";
+				}
+			}
+		});
+		phTracker.track("div[data-gif]", (wrapper) => {
+			if (wrapper.querySelector(".custom-gif-link-btn")) return;
+			const gifUrl = wrapper.getAttribute("data-gif");
+			const btn = document.createElement("a");
+			btn.href = gifUrl;
+			btn.target = "_blank";
+			btn.innerText = "GIF";
+			btn.className = "custom-gif-link-btn";
+			Object.assign(btn.style, {
+				position: "absolute",
+				right: "2px",
+				bottom: "2px",
+				width: "auto",
+				backgroundColor: "rgba(0, 0, 0, 0.6)",
+				color: "#fff",
+				padding: "2px 4px",
+				borderRadius: "3px",
+				fontSize: "12px",
+				zIndex: "10",
+				pointerEvents: "auto"
+			});
+			wrapper.parentElement.appendChild(btn);
+		});
 		if (url.includes("search")) {
+			const pageUrl = new URL(url);
 			const pageType = pageUrl.pathname.match(/^\/(video|gif|gifs)$/)?.[1];
 			if (pageType) {
 				pageUrl.pathname = `/${pageType}/search`;
@@ -119,29 +157,6 @@
 			});
 			document.body.appendChild(button);
 		}
-		new ElementTracker().track("div[data-gif]", (wrapper) => {
-			if (wrapper.querySelector(".custom-gif-link-btn")) return;
-			const gifUrl = wrapper.getAttribute("data-gif");
-			const btn = document.createElement("a");
-			btn.href = gifUrl;
-			btn.target = "_blank";
-			btn.innerText = "GIF";
-			btn.className = "custom-gif-link-btn";
-			Object.assign(btn.style, {
-				position: "absolute",
-				right: "2px",
-				bottom: "2px",
-				width: "auto",
-				backgroundColor: "rgba(0, 0, 0, 0.6)",
-				color: "#fff",
-				padding: "2px 4px",
-				borderRadius: "3px",
-				fontSize: "12px",
-				zIndex: "10",
-				pointerEvents: "auto"
-			});
-			wrapper.parentElement.appendChild(btn);
-		});
 	})();
 	(function handle_sexcom() {
 		if (!window.location.href.includes("sex.com")) return;

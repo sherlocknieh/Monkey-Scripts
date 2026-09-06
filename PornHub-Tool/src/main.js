@@ -77,6 +77,8 @@ class ElementTracker {
     const url = window.location.href;
     if (!url.includes('pornhub.com')) return;
 
+    const phTracker = new ElementTracker();
+
     // Pornhub 后台不暂停视频
     (function no_pause_on_background() {
         Object.defineProperty(document, 'hidden', { get: () => false });
@@ -106,14 +108,77 @@ class ElementTracker {
     });
 
     // 切换GIF静音图标
-    const tracker = new ElementTracker();
-    tracker.track('#js-volumeToggle', volBtn => {
+    phTracker.track('#js-volumeToggle', volBtn => {
         volBtn.classList.remove('muted');
     });
 
-    // GIF 搜索页与 Video 搜索页互转按钮
-    const pageUrl = new URL(url);
+    // 优先显示原始标题
+    phTracker.track('.title-container, .headerWrap', (container) => {
+        // 适配移动端与桌面端的标题节点选择器
+        const titleSpan = container.querySelector('h1 .inlineFree') || container.querySelector('.inlineFree');
+        const btn = container.querySelector('.js-originalTranslation');
+        const swapTitleText = btn ? btn.querySelector('.swapTitle') : null;
+
+        if (window.VIDEO_SHOW && window.VIDEO_SHOW.videoTitleOriginal && titleSpan) {
+            const targetTitle = window.VIDEO_SHOW.videoTitleOriginal.trim();
+            const currentTitle = titleSpan.innerHTML.trim();
+
+            // 核心：当标题内容不等于原标题时强行替换
+            if (currentTitle !== targetTitle) {
+                // A. 替换 DOM 渲染文本
+                titleSpan.innerHTML = targetTitle;
+
+                // B. 关键点：将移动端原生脚本依赖的 titleWrapper 强行重定向为当前节点的父级
+                // 防止网页自身后续调用 titleWrapper.innerHTML 时更新错误的位置
+                window.titleWrapper = titleSpan;
+
+                // C. 修正按钮样式与状态文字
+                if (btn) btn.classList.add('original');
+                if (swapTitleText) {
+                    swapTitleText.textContent = window.VIDEO_SHOW.seeTranslatedTitle || '查看翻译标题';
+                }
+            }
+        }
+    });
+
+    // GIF 小图链接按钮
+    // 追踪含有 data-gif 属性的 div 元素
+    phTracker.track('div[data-gif]', wrapper => {
+        // 避免重复添加按钮
+        if (wrapper.querySelector('.custom-gif-link-btn')) return;
+        // 获取链接
+        const gifUrl = wrapper.getAttribute('data-gif');
+        // 创建按钮
+        const btn = document.createElement('a');
+        btn.href = gifUrl;
+        btn.target = '_blank';
+        btn.innerText = 'GIF';
+        btn.className = 'custom-gif-link-btn';
+
+        // 设置按钮样式
+        Object.assign(btn.style, {
+            position: 'absolute',
+            right: '2px',
+            bottom: '2px',
+            width: 'auto',
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            color: '#fff',
+            padding: '2px 4px',
+            borderRadius: '3px',
+            fontSize: '12px',
+            zIndex: '10', // 确保在图片上层但不过高
+            pointerEvents: 'auto'
+        });
+
+        // 获取父级容器
+        const container = wrapper.parentElement;
+        // 挂载按钮到父级容器
+        container.appendChild(btn);
+    });
+
+    // GIF 与 Video 搜索页互转按钮
     if (url.includes('search')) {
+        const pageUrl = new URL(url);
         // 修正官方的错误链接（video?search 或 gif?search）
         const pageType = pageUrl.pathname.match(/^\/(video|gif|gifs)$/)?.[1];
         if (pageType) {
@@ -150,42 +215,6 @@ class ElementTracker {
         // 挂载按钮到 body
         document.body.appendChild(button);
     }
-
-    // GIF 链接提取按钮
-    const phTracker = new ElementTracker();
-    // 追踪含有 data-gif 属性的 div 元素
-    phTracker.track('div[data-gif]', wrapper => {
-        // 避免重复添加按钮
-        if (wrapper.querySelector('.custom-gif-link-btn')) return;
-        // 获取链接
-        const gifUrl = wrapper.getAttribute('data-gif');
-        // 创建按钮
-        const btn = document.createElement('a');
-        btn.href = gifUrl;
-        btn.target = '_blank';
-        btn.innerText = 'GIF';
-        btn.className = 'custom-gif-link-btn';
-
-        // 设置按钮样式
-        Object.assign(btn.style, {
-            position: 'absolute',
-            right: '2px',
-            bottom: '2px',
-            width: 'auto',
-            backgroundColor: 'rgba(0, 0, 0, 0.6)',
-            color: '#fff',
-            padding: '2px 4px',
-            borderRadius: '3px',
-            fontSize: '12px',
-            zIndex: '10', // 确保在图片上层但不过高
-            pointerEvents: 'auto'
-        });
-
-        // 获取父级容器
-        const container = wrapper.parentElement;
-        // 挂载按钮到父级容器
-        container.appendChild(btn);
-    });
 
 })();
 
