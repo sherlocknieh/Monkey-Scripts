@@ -28,6 +28,18 @@ export function getHost() {
   return shadowHost;
 }
 
+let dropRoot = null;
+
+export function getDropRoot() {
+  if (!shadowRoot) initialize();
+  if (!dropRoot) {
+    dropRoot = document.createElement('div');
+    dropRoot.id = 'sej-drop-lists';
+    shadowRoot.appendChild(dropRoot);
+  }
+  return dropRoot;
+}
+
 export function getRoot() {
   if (!shadowRoot) initialize();
   return shadowRoot;

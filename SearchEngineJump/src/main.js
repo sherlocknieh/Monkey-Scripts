@@ -18,6 +18,7 @@ addStyle(`
   .iqxin-help-link { color: #999; }
   #iqxin-editCodeBox textarea { overflow: auto; border-radius: 4px; }
   .iqxin-warning { color: red; font-size: 1.2em; }
+  #sej-drop-lists { display: contents; }
 `);
 
 applyDarkModeIfNeeded();
