@@ -3,7 +3,7 @@
 - [PornHubTool](https://github.com/sherlocknieh/Monkey-Scripts/raw/main/PornHubTool/dist/pornhub-tool.user.js
 )
 
-- [SearchEngineJump](https://github.com/sherlocknieh/Monkey-Scripts/raw/main/SearchEngineJump/dist/search-engine-jump.user.js)
+- [SearchEngineJump++](https://github.com/sherlocknieh/Monkey-Scripts/raw/main/SearchEngineJump/dist/search-engine-jump.user.js)
 
 
 
