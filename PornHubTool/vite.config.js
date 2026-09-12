@@ -9,6 +9,7 @@ export default defineConfig({
       userscript: {
         icon: 'https://vitejs.dev/logo.svg',
         namespace: 'npm/vite-plugin-monkey',
+        name: 'PornHubTool',
         match: [
           'https://greasyfork.org/*',
           'https://sleazyfork.org/*',
