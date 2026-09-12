@@ -100,3 +100,14 @@ export function addStyle(cssText) {
   style.textContent = cssText;
   shadowRoot.appendChild(style);
 }
+
+// 重置 Shadow DOM 状态，用于 SPA 路由变化后重建
+export function reset() {
+  if (shadowHost?.parentNode) {
+    shadowHost.parentNode.removeChild(shadowHost);
+  }
+  shadowHost = null;
+  shadowRoot = null;
+  dropRoot = null;
+  constructableSheets.length = 0;
+}

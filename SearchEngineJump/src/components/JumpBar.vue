@@ -18,6 +18,7 @@ import {
 } from '../core/jump.js';
 import EngineItem from './EngineItem.vue';
 import EngineCategory from './EngineCategory.vue';
+import SettingButton from './SettingButton.vue';
 
 const settings = useSettings();
 const data = settings.settingData;
@@ -276,5 +277,7 @@ onBeforeUnmount(() => {
         @jump-all="onJumpAll(category.engines)"
       />
     </template>
+
+    <SettingButton />
   </div>
 </template>

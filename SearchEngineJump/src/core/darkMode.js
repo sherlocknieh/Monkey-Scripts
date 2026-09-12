@@ -99,8 +99,11 @@ export function applyDarkModeIfNeeded() {
   if (isDarkMode()) addStyle(DARK_MODE_STYLE);
 }
 
+let darkModeWatched = false;
+
 export function watchDarkModeChanges() {
-  if (!window.matchMedia) return;
+  if (darkModeWatched || !window.matchMedia) return;
+  darkModeWatched = true;
 
   const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
   let lastDarkModeState = darkModeQuery.matches;

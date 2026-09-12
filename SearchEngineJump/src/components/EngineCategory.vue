@@ -1,5 +1,5 @@
 <script setup>
-import { nextTick, ref } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { getDropRoot } from '../core/shadow.js';
 import EngineItem from './EngineItem.vue';
 
@@ -20,17 +20,43 @@ const active = ref(false);
 const top = ref('0px');
 const left = ref('0px');
 
-const SHOW_DELAY = 233;
-const HIDE_DELAY = 233;
+const SHOW_DELAY = 60;
+const HIDE_DELAY = 0;
 let showTimer = null;
 let hideTimer = null;
 
-function position() {
+const pointer = { x: -1, y: -1 };
+
+function hitTest(el) {
+  if (!el) return false;
+  const rect = el.getBoundingClientRect();
+  return (
+    rect.width > 0 &&
+    rect.height > 0 &&
+    pointer.x >= rect.left &&
+    pointer.x <= rect.right &&
+    pointer.y >= rect.top &&
+    pointer.y <= rect.bottom
+  );
+}
+
+function measureAndPosition() {
   if (!triggerEl.value || !listEl.value) return;
   const rect = triggerEl.value.getBoundingClientRect();
-  const listWidth = listEl.value.getBoundingClientRect().width;
-  top.value = rect.bottom + 'px';
-  left.value = rect.left - (listWidth - rect.width) / 2 + 'px';
+  const listRect = listEl.value.getBoundingClientRect();
+  const listWidth = listRect.width;
+  const listHeight = listRect.height;
+
+  let posLeft = rect.left - (listWidth - rect.width) / 2;
+  posLeft = Math.max(8, Math.min(posLeft, window.innerWidth - listWidth - 8));
+
+  let posTop = rect.bottom;
+  if (posTop + listHeight > window.innerHeight - 8 && rect.top - listHeight > 8) {
+    posTop = rect.top - listHeight;
+  }
+
+  top.value = posTop + 'px';
+  left.value = posLeft + 'px';
 }
 
 function show() {
@@ -39,33 +65,53 @@ function show() {
     active.value = true;
     return;
   }
+  clearTimeout(showTimer);
   showTimer = setTimeout(async () => {
+    if (!triggerEl.value) return;
     shown.value = true;
     await nextTick();
-    if (!triggerEl.value || !listEl.value) return;
-    const rect = triggerEl.value.getBoundingClientRect();
-    top.value = rect.bottom + 6 + 'px';
-    const listWidth = listEl.value.getBoundingClientRect().width;
-    left.value = rect.left - (listWidth - rect.width) / 2 + 'px';
-    requestAnimationFrame(() => {
-      active.value = true;
-      position();
-    });
+    measureAndPosition();
+    active.value = true;
   }, SHOW_DELAY);
 }
 
-function hide() {
-  clearTimeout(showTimer);
-  if (!shown.value) return;
-  active.value = false;
+function scheduleHide() {
+  clearTimeout(hideTimer);
   hideTimer = setTimeout(() => {
+    if (hitTest(triggerEl.value) || hitTest(listEl.value)) return;
+    active.value = false;
     shown.value = false;
   }, HIDE_DELAY);
 }
+
+// 用指针坐标统一判定是否仍在触发器/子菜单范围内，
+// 不依赖 enter/leave 事件顺序，避免间隙、裁剪或事件丢失导致误关闭
+function onDocMouseMove(e) {
+  pointer.x = e.clientX;
+  pointer.y = e.clientY;
+  if (!shown.value) return;
+
+  if (hitTest(triggerEl.value) || hitTest(listEl.value)) {
+    clearTimeout(hideTimer);
+    active.value = true;
+  } else {
+    scheduleHide();
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('mousemove', onDocMouseMove);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('mousemove', onDocMouseMove);
+  clearTimeout(showTimer);
+  clearTimeout(hideTimer);
+});
 </script>
 
 <template>
-  <span class="sej-category" @mouseenter="show" @mouseleave="hide">
+  <span class="sej-category" @mouseenter="show" @mouseleave="scheduleHide">
     <a
       ref="triggerEl"
       class="sej-engine sej-drop-list-trigger"
@@ -90,10 +136,12 @@ function hide() {
           top,
           left,
           opacity: active ? 1 : 0.2,
-          pointerEvents: active ? 'auto' : 'none',
+          pointerEvents: shown ? 'auto' : 'none',
+          transition: 'opacity 0.1s ease-out',
+          zIndex: 100000000,
         }"
         @mouseenter="show"
-        @mouseleave="hide"
+        @mouseleave="scheduleHide"
       >
         <EngineItem
           v-for="engine in engines"

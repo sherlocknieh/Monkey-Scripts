@@ -175,13 +175,15 @@
 #btnEle2 {
   visibility: hidden;
   opacity: 0;
-  transform: translate(0, 40px);
+  bottom: 52px !important;
+  transform: translate(0, 16px);
   transition: 0.3s;
+  z-index: 2;
 }
 #btnEle2.btnEle2active {
   visibility: visible;
   opacity: 1;
-  transform: translate(0, 53px);
+  transform: translate(0, 0);
 }
 #settingLayerMask input[type="checkbox"] {
   width: 12px;
@@ -629,4 +631,43 @@ body[qxintheme="dark"] {
     transform: scale(1, 1);
     opacity: 1;
   }
+}
+
+/* ---------- Vue 重构版设置面板布局优化 ---------- */
+#settingLayerMask {
+  padding: 20px;
+  box-sizing: border-box;
+}
+#settingLayer {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  box-sizing: border-box;
+  width: auto;
+  min-width: min(700px, calc(100vw - 80px));
+  max-width: calc(100vw - 80px);
+  max-height: calc(100vh - 80px);
+  margin: 0;
+  overflow: visible;
+}
+#sej-settings-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 110px;
+}
+#sej-settings-body::-webkit-scrollbar {
+  width: 8px;
+}
+#sej-settings-body::-webkit-scrollbar-thumb {
+  background: var(--background-avtive-color-qxin);
+  border-radius: 4px;
+}
+#settingLayer #btnEle,
+#settingLayer #btnEle2 {
+  flex: 0 0 auto;
 }

@@ -22,6 +22,7 @@ export default defineConfig({
         exclude: ['*://mega.nz/*'],
         noframes: true,
         runAt: 'document-idle',
+        grant: ['window.onurlchange'],
       },
       build: {
         fileName: 'search-engine-jump.user.js',
