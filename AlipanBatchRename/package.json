@@ -1,7 +1,7 @@
 {
     "name": "alipan-batch-rename",
     "private": true,
-    "version": "0.7.0",
+    "version": "2026.9.13.0",
     "type": "module",
     "scripts": {
         "dev": "vite",

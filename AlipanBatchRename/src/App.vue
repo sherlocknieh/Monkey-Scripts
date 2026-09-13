@@ -161,17 +161,19 @@
 		</el-dialog>
 
 		<!-- 启动按钮 -->
-		<el-button @click="handleBatchBtnClick"
-			class="fixed z-1000 bottom-30 right-12 rounded-full! border-0! px-8 h-10 text-white  bg-linear-to-r from-[#637dff] to-[#637dff] transition-all duration-300 ease-out active:translate-y-0 active:shadow-[0_8px_20px_rgba(99,125,255,0.35)]" type="primary">
-			批量重命名
-		</el-button>
+		<teleport v-if="headerElement" :to="headerElement">
+			<el-button @click="handleBatchBtnClick"
+				class="shrink-0 rounded-full! border-0! px-5 h-9 text-white bg-linear-to-r from-[#637dff] to-[#637dff] transition-all duration-300 ease-out active:translate-y-0 active:shadow-[0_8px_20px_rgba(99,125,255,0.35)]" style="margin-left: 12px;" type="primary">
+				批量重命名
+			</el-button>
+		</teleport>
 	</div>
 </template>
 
 
 <script setup>
 
-import { computed, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import draggable from 'vuedraggable';
 import { ElMessage, ElMessageBox } from 'element-plus';
 
@@ -184,6 +186,7 @@ let parentFileName = '';
 let dialogVisible1 = ref(false);
 let dialogVisible2 = ref(false);
 let loading = ref(false);
+let headerElement = ref(null);
 let indexNumber = ref('');
 let prefix = ref('');
 let suffix = ref('');
@@ -195,6 +198,22 @@ let fileExtension = ref('');
 const data = reactive({
 	list: [], // 原始列表
 	sortList: [] // 排序后的列表
+});
+
+let headerObserver;
+
+function updateHeaderElement() {
+	headerElement.value = document.querySelector('header');
+}
+
+onMounted(() => {
+	updateHeaderElement();
+	headerObserver = new MutationObserver(updateHeaderElement);
+	headerObserver.observe(document.body, { childList: true, subtree: true });
+});
+
+onBeforeUnmount(() => {
+	headerObserver?.disconnect();
 });
 
 const padStartNum = computed(() => {
