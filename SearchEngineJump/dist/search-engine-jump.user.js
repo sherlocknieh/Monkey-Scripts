@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SearchEngineJump++
 // @namespace    npm/vite-plugin-monkey
-// @version      2026.9.12.0
+// @version      2026.10.16.18
 // @author       NLF & 锐经 & iqxin & MUTED64
 // @description  Fork 版本搜索引擎跳转脚本，Vue 重构版。在搜索页插入跳转小横条，支持划词搜索、分类下拉、设置菜单等。
 // @license      MIT
@@ -15558,7 +15558,7 @@
 	var _hoisted_7 = ["src"];
 	var _hoisted_8 = ["onClick"];
 	var _hoisted_9 = ["src"];
-	var _hoisted_10 = { class: "sejcon" };
+	var _hoisted_10 = ["onDrop"];
 	var _hoisted_11 = ["onDragstart", "onDrop"];
 	var _hoisted_12 = [
 		"data-iqxintitle",
@@ -15786,8 +15786,12 @@
 					if (ctx.ci === ci) return;
 					moveArray(draft.categories, ctx.ci, ci);
 				} else {
-					if (ctx.ci !== ci || ctx.ei === ei) return;
-					moveArray(draft.categories[ci].engines, ctx.ei, ei);
+					const sourceList = draft.categories[ctx.ci].engines;
+					const targetList = draft.categories[ci].engines;
+					if (ctx.ci === ci && (ei == null || ctx.ei === ei)) return;
+					const [engine] = sourceList.splice(ctx.ei, 1);
+					const targetIndex = ei == null ? targetList.length : ctx.ci === ci && ctx.ei < ei ? ei - 1 : ei;
+					targetList.splice(targetIndex, 0, engine);
 				}
 			}
 			function addEngine(ci) {
@@ -15938,7 +15942,7 @@
 					ref_key: "layerEl",
 					ref: layerEl,
 					style: normalizeStyle([{ transform: maskVisible.value ? "none" : "translateY(-20%)" }, layerStyle.value]),
-					onClick: _cache[17] || (_cache[17] = withModifiers(() => {}, ["stop"]))
+					onClick: _cache[18] || (_cache[18] = withModifiers(() => {}, ["stop"]))
 				}, [
 					createBaseVNode("div", {
 						id: "dragDom",
@@ -15993,7 +15997,11 @@
 								src: unref(delIcon),
 								alt: ""
 							}, null, 8, _hoisted_9)], 10, _hoisted_8)
-						], 40, _hoisted_3), createBaseVNode("div", _hoisted_10, [(openBlock(true), createElementBlock(Fragment, null, renderList(category.engines, (engine, ei) => {
+						], 40, _hoisted_3), createBaseVNode("div", {
+							class: "sejcon",
+							onDragover: _cache[3] || (_cache[3] = withModifiers(() => {}, ["prevent"])),
+							onDrop: ($event) => onDrop($event, "engine", ci)
+						}, [(openBlock(true), createElementBlock(Fragment, null, renderList(category.engines, (engine, ei) => {
 							return openBlock(), createElementBlock("span", {
 								key: engine._id,
 								class: "drag",
@@ -16038,7 +16046,7 @@
 						}), 128)), createBaseVNode("span", {
 							class: normalizeClass(["iqxin-additem", { "iqxin-set-active": addDelMode.value }]),
 							onClick: withModifiers(($event) => addEngine(ci), ["stop"])
-						}, "+", 10, _hoisted_18)])], 8, _hoisted_2);
+						}, "+", 10, _hoisted_18)], 40, _hoisted_10)], 8, _hoisted_2);
 					}), 128))]),
 					createBaseVNode("div", {
 						id: "btnEle2",
@@ -16054,32 +16062,32 @@
 							title: "配置文件",
 							onClick: openConfig
 						}, " 配置文件 "),
-						createBaseVNode("span", _hoisted_19, [createBaseVNode("label", null, [_cache[18] || (_cache[18] = createTextVNode("划词搜索", -1)), withDirectives(createBaseVNode("input", {
+						createBaseVNode("span", _hoisted_19, [createBaseVNode("label", null, [_cache[19] || (_cache[19] = createTextVNode("划词搜索", -1)), withDirectives(createBaseVNode("input", {
 							type: "checkbox",
-							"onUpdate:modelValue": _cache[3] || (_cache[3] = ($event) => draft.selectSearch = $event)
+							"onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => draft.selectSearch = $event)
 						}, null, 512), [[vModelCheckbox, draft.selectSearch]])])]),
-						createBaseVNode("span", _hoisted_20, [createBaseVNode("label", null, [_cache[19] || (_cache[19] = createTextVNode("动画", -1)), withDirectives(createBaseVNode("input", {
+						createBaseVNode("span", _hoisted_20, [createBaseVNode("label", null, [_cache[20] || (_cache[20] = createTextVNode("动画", -1)), withDirectives(createBaseVNode("input", {
 							type: "checkbox",
-							"onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => draft.transtion = $event)
+							"onUpdate:modelValue": _cache[5] || (_cache[5] = ($event) => draft.transtion = $event)
 						}, null, 512), [[vModelCheckbox, draft.transtion]])])]),
-						createBaseVNode("span", _hoisted_21, [createBaseVNode("label", null, [_cache[20] || (_cache[20] = createTextVNode("折叠当前搜索分类", -1)), withDirectives(createBaseVNode("input", {
+						createBaseVNode("span", _hoisted_21, [createBaseVNode("label", null, [_cache[21] || (_cache[21] = createTextVNode("折叠当前搜索分类", -1)), withDirectives(createBaseVNode("input", {
 							type: "checkbox",
-							"onUpdate:modelValue": _cache[5] || (_cache[5] = ($event) => draft.foldlist = $event)
+							"onUpdate:modelValue": _cache[6] || (_cache[6] = ($event) => draft.foldlist = $event)
 						}, null, 512), [[vModelCheckbox, draft.foldlist]])])]),
-						createBaseVNode("span", _hoisted_22, [createBaseVNode("label", null, [_cache[21] || (_cache[21] = createTextVNode("固定到顶端", -1)), withDirectives(createBaseVNode("input", {
+						createBaseVNode("span", _hoisted_22, [createBaseVNode("label", null, [_cache[22] || (_cache[22] = createTextVNode("固定到顶端", -1)), withDirectives(createBaseVNode("input", {
 							type: "checkbox",
-							"onUpdate:modelValue": _cache[6] || (_cache[6] = ($event) => draft.fixedTop = $event)
+							"onUpdate:modelValue": _cache[7] || (_cache[7] = ($event) => draft.fixedTop = $event)
 						}, null, 512), [[vModelCheckbox, draft.fixedTop]])])]),
-						createBaseVNode("span", _hoisted_23, [createBaseVNode("label", null, [_cache[22] || (_cache[22] = createTextVNode("仅上拉显示", -1)), withDirectives(createBaseVNode("input", {
+						createBaseVNode("span", _hoisted_23, [createBaseVNode("label", null, [_cache[23] || (_cache[23] = createTextVNode("仅上拉显示", -1)), withDirectives(createBaseVNode("input", {
 							type: "checkbox",
-							"onUpdate:modelValue": _cache[7] || (_cache[7] = ($event) => draft.fixedTopUpward = $event)
+							"onUpdate:modelValue": _cache[8] || (_cache[8] = ($event) => draft.fixedTopUpward = $event)
 						}, null, 512), [[vModelCheckbox, draft.fixedTopUpward]])])]),
-						createBaseVNode("span", _hoisted_24, [createBaseVNode("label", null, [_cache[23] || (_cache[23] = createTextVNode("隐藏同站链接", -1)), withDirectives(createBaseVNode("input", {
+						createBaseVNode("span", _hoisted_24, [createBaseVNode("label", null, [_cache[24] || (_cache[24] = createTextVNode("隐藏同站链接", -1)), withDirectives(createBaseVNode("input", {
 							type: "checkbox",
-							"onUpdate:modelValue": _cache[8] || (_cache[8] = ($event) => draft.HideTheSameLink = $event)
+							"onUpdate:modelValue": _cache[9] || (_cache[9] = ($event) => draft.HideTheSameLink = $event)
 						}, null, 512), [[vModelCheckbox, draft.HideTheSameLink]])])]),
 						createBaseVNode("span", _hoisted_25, [
-							_cache[24] || (_cache[24] = createTextVNode(" 设置按钮透明度 ", -1)),
+							_cache[25] || (_cache[25] = createTextVNode(" 设置按钮透明度 ", -1)),
 							createBaseVNode("input", {
 								id: "setBtnOpacityRange",
 								type: "range",
@@ -16096,25 +16104,25 @@
 						])
 					])], 2),
 					createBaseVNode("div", _hoisted_27, [createBaseVNode("div", _hoisted_28, [
-						_cache[30] || (_cache[30] = createBaseVNode("span", {
+						_cache[31] || (_cache[31] = createBaseVNode("span", {
 							class: "feedback",
 							title: "在 GreasyFork 进行反馈"
 						}, [createBaseVNode("a", {
 							target: "_blank",
 							href: "https://greasyfork.org/en/scripts/454280-searchenginejumpplus"
 						}, "Greasy Fork")], -1)),
-						_cache[31] || (_cache[31] = createBaseVNode("span", {
+						_cache[32] || (_cache[32] = createBaseVNode("span", {
 							class: "feedback",
 							title: "在 Github 进行反馈"
 						}, [createBaseVNode("a", {
 							target: "_blank",
 							href: "https://github.com/MUTED64/SearchEngineJumpPlus"
 						}, "GitHub")], -1)),
-						createBaseVNode("span", _hoisted_29, [createBaseVNode("label", null, [_cache[25] || (_cache[25] = createTextVNode("一键搜索", -1)), withDirectives(createBaseVNode("input", {
+						createBaseVNode("span", _hoisted_29, [createBaseVNode("label", null, [_cache[26] || (_cache[26] = createTextVNode("一键搜索", -1)), withDirectives(createBaseVNode("input", {
 							type: "checkbox",
-							"onUpdate:modelValue": _cache[9] || (_cache[9] = ($event) => draft.allOpen = $event)
+							"onUpdate:modelValue": _cache[10] || (_cache[10] = ($event) => draft.allOpen = $event)
 						}, null, 512), [[vModelCheckbox, draft.allOpen]])])]),
-						createBaseVNode("span", _hoisted_30, [_cache[27] || (_cache[27] = createTextVNode(" 居中： ", -1)), withDirectives(createBaseVNode("select", { "onUpdate:modelValue": _cache[10] || (_cache[10] = ($event) => draft.center = $event) }, [..._cache[26] || (_cache[26] = [
+						createBaseVNode("span", _hoisted_30, [_cache[28] || (_cache[28] = createTextVNode(" 居中： ", -1)), withDirectives(createBaseVNode("select", { "onUpdate:modelValue": _cache[11] || (_cache[11] = ($event) => draft.center = $event) }, [..._cache[27] || (_cache[27] = [
 							createBaseVNode("option", { value: 0 }, "默认", -1),
 							createBaseVNode("option", { value: 1 }, "强制", -1),
 							createBaseVNode("option", { value: 2 }, "自动", -1)
@@ -16124,7 +16132,7 @@
 							void 0,
 							{ number: true }
 						]])]),
-						createBaseVNode("span", _hoisted_31, [_cache[29] || (_cache[29] = createTextVNode(" 打开方式： ", -1)), withDirectives(createBaseVNode("select", { "onUpdate:modelValue": _cache[11] || (_cache[11] = ($event) => draft.newtab = $event) }, [..._cache[28] || (_cache[28] = [createBaseVNode("option", { value: 0 }, "默认页面", -1), createBaseVNode("option", { value: 1 }, "新标签页", -1)])], 512), [[
+						createBaseVNode("span", _hoisted_31, [_cache[30] || (_cache[30] = createTextVNode(" 打开方式： ", -1)), withDirectives(createBaseVNode("select", { "onUpdate:modelValue": _cache[12] || (_cache[12] = ($event) => draft.newtab = $event) }, [..._cache[29] || (_cache[29] = [createBaseVNode("option", { value: 0 }, "默认页面", -1), createBaseVNode("option", { value: 1 }, "新标签页", -1)])], 512), [[
 							vModelSelect,
 							draft.newtab,
 							void 0,
@@ -16140,7 +16148,7 @@
 							id: "moreSet",
 							title: "more set",
 							class: normalizeClass({ "iqxin-btn-active": moreOpen.value }),
-							onClick: _cache[12] || (_cache[12] = ($event) => moreOpen.value = !moreOpen.value)
+							onClick: _cache[13] || (_cache[13] = ($event) => moreOpen.value = !moreOpen.value)
 						}, "更多设置", 2),
 						createBaseVNode("span", {
 							id: "xin-save",
@@ -16179,20 +16187,20 @@
 						initial: engineDialog.value.initial,
 						"resolve-icon": getICON,
 						onSubmit: submitEngine,
-						onCancel: _cache[13] || (_cache[13] = ($event) => engineDialog.value = null)
+						onCancel: _cache[14] || (_cache[14] = ($event) => engineDialog.value = null)
 					}, null, 8, ["mode", "initial"])) : createCommentVNode("", true),
 					categoryDialog.value ? (openBlock(), createBlock(_sfc_main$4, {
 						key: 2,
 						onSubmit: submitCategory,
-						onCancel: _cache[14] || (_cache[14] = ($event) => categoryDialog.value = false)
+						onCancel: _cache[15] || (_cache[15] = ($event) => categoryDialog.value = false)
 					})) : createCommentVNode("", true),
 					configOpen.value ? (openBlock(), createBlock(_sfc_main$3, {
 						key: 3,
 						"initial-text": configText.value,
 						onSave: saveConfig,
 						onReset: reset,
-						onClose: _cache[15] || (_cache[15] = ($event) => configOpen.value = false),
-						onCopy: _cache[16] || (_cache[16] = ($event) => unref(showToast)("复制成功"))
+						onClose: _cache[16] || (_cache[16] = ($event) => configOpen.value = false),
+						onCopy: _cache[17] || (_cache[17] = ($event) => unref(showToast)("复制成功"))
 					}, null, 8, ["initial-text"])) : createCommentVNode("", true)
 				], 4)], 4);
 			};
