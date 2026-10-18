@@ -123,8 +123,7 @@ const webRules = [
     fixedTop: 60,
     engineList: "web",
     style: `
-      margin-top: 1em;
-      top: 0.5em;
+      margin: 1em auto;
     `,
     style_ACBaidu: `
       text-align: center;
@@ -135,7 +134,7 @@ const webRules = [
     insertIntoDoc: {
       keyword: "css;#sb_form_q",
       target: "css;#b_content",
-      where: "beforeBegin",
+      where: "afterBegin",
     },
   },
   {
