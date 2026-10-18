@@ -38,15 +38,13 @@ const webRules = [
     fixedTop: 56,
     style: `
       z-index: 100;
-      margin-top:15px;
-      margin-bottom:5px;
+      margin: 1px auto;
       grid-column: 2 / -2;
     `,
     style_ACBaidu: `
       text-align: center;
       z-index: 100;
-      margin-top:5px;
-      margin: auto;
+      margin: 1px auto;
     `,
     insertIntoDoc: {
       target: "css;#appbar",
@@ -64,7 +62,7 @@ const webRules = [
     style: `
       left: 142px;
       z-index: 100;
-      margin-top:5px;
+      margin: 1px auto;
     `,
     style_ACBaidu: `
       text-align: center;
