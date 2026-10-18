@@ -132,7 +132,7 @@ const webRules = [
     insertIntoDoc: {
       keyword: "css;#sb_form_q",
       target: "css;#b_content",
-      where: "afterBegin",
+      where: "beforeBegin",
     },
   },
   {

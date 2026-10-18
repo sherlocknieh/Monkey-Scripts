@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SearchEngineJump++
 // @namespace    npm/vite-plugin-monkey
-// @version      2026.10.19.04
+// @version      2026.10.19.05
 // @author       NLF & 锐经 & iqxin & MUTED64
 // @description  Fork 版本搜索引擎跳转脚本，Vue 重构版。在搜索页插入跳转小横条，支持划词搜索、分类下拉、设置菜单等。
 // @license      MIT
@@ -5346,7 +5346,7 @@
 			insertIntoDoc: {
 				keyword: "css;#sb_form_q",
 				target: "css;#b_content",
-				where: "afterBegin"
+				where: "beforeBegin"
 			}
 		},
 		{
