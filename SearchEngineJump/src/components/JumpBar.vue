@@ -220,22 +220,6 @@ onMounted(async () => {
     }
   }
 
-  if (
-    !inlineStyleBlocked &&
-    containerEl.value &&
-    getComputedStyle(containerEl.value).position !== 'sticky' &&
-    !isSelectSearch.value &&
-    !resolvedStyle.includes('sticky') &&
-    !resolvedStyle.includes('fixed')
-  ) {
-    const style = getComputedStyle(containerEl.value);
-    const height =
-      containerEl.value.offsetHeight +
-      parseFloat(style.marginTop) +
-      parseFloat(style.marginBottom) +
-      'px';
-    getHost().style.height = height;
-  }
 });
 
 onBeforeUnmount(() => {

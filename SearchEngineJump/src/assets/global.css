@@ -470,11 +470,13 @@ span#setBtn:hover {
   background: var(--background-color-qxin);
   backdrop-filter: blur(40px);
   width: max-content !important;
+  max-width: 100%;
+  box-sizing: border-box;
   border-radius: 8px;
   border-width: thin;
   border-style: solid;
   border-color: var(--border-color-sej);
-  overflow: hidden;
+  overflow: auto;
   box-shadow: 0 0 0.6em var(--box-shadow-color-sej);
   height: fit-content;
   flex-wrap: wrap;

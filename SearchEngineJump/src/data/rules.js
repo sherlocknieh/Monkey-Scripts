@@ -123,7 +123,7 @@ const webRules = [
     fixedTop: 60,
     engineList: "web",
     style: `
-      margin: 1em auto;
+      margin: 1px auto;
     `,
     style_ACBaidu: `
       text-align: center;
