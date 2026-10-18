@@ -124,7 +124,6 @@ const webRules = [
     engineList: "web",
     style: `
       margin-top: 1em;
-      left: 160px;
       top: 0.5em;
     `,
     style_ACBaidu: `
