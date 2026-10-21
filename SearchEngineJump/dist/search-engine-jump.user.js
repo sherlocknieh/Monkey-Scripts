@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SearchEngineJump++
 // @namespace    npm/vite-plugin-monkey
-// @version      2026.10.22.02
+// @version      2026.10.22.04
 // @author       NLF & 锐经 & iqxin & MUTED64
 // @description  Fork 版本搜索引擎跳转脚本，Vue 重构版。在搜索页插入跳转小横条，支持划词搜索、分类下拉、设置菜单等。
 // @license      MIT
@@ -15519,7 +15519,7 @@
 						rows: "20"
 					}, null, 512), [[vModelText, text.value]]),
 					_cache[5] || (_cache[5] = createBaseVNode("br", null, null, -1)),
-					createBaseVNode("button", { onClick: _cache[1] || (_cache[1] = ($event) => _ctx.$emit("reset")) }, "清空设置"),
+					createBaseVNode("button", { onClick: _cache[1] || (_cache[1] = ($event) => _ctx.$emit("reset")) }, "恢复默认"),
 					_cache[6] || (_cache[6] = createTextVNode(" \xA0\xA0\xA0 ", -1)),
 					createBaseVNode("button", { onClick: copy }, "复制"),
 					_cache[7] || (_cache[7] = createTextVNode(" \xA0\xA0\xA0 ", -1)),
@@ -16051,11 +16051,6 @@
 						id: "btnEle2",
 						class: normalizeClass({ btnEle2active: moreOpen.value })
 					}, [createBaseVNode("div", null, [
-						createBaseVNode("span", {
-							id: "xin-reset",
-							title: "慎点,出厂重置",
-							onClick: reset
-						}, " 清空设置 "),
 						createBaseVNode("span", {
 							id: "xin-modification",
 							title: "配置文件",

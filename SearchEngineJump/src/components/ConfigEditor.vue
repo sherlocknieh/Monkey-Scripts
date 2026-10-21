@@ -37,7 +37,7 @@ function copy() {
     </p>
     <textarea v-model="text" wrap="off" cols="45" rows="20"></textarea>
     <br />
-    <button @click="$emit('reset')">清空设置</button>
+    <button @click="$emit('reset')">恢复默认</button>
     &nbsp;&nbsp;&nbsp;
     <button @click="copy">复制</button>
     &nbsp;&nbsp;&nbsp;

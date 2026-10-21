@@ -429,9 +429,6 @@ onBeforeUnmount(() => {
             <!-- 更多设置按钮 -->
             <div id="btnEle2" :class="{ btnEle2active: moreOpen }">
                 <div>
-                    <span id="xin-reset" title="慎点,出厂重置" @click="reset">
-                        清空设置
-                    </span>
                     <span id="xin-modification" title="配置文件" @click="openConfig">
                         配置文件
                     </span>
