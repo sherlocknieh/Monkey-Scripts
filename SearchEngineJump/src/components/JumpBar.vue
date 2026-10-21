@@ -234,10 +234,11 @@ onBeforeUnmount(() => {
     v-if="ready"
     ref="containerEl"
     id="sej-container"
-    :class="[containerClass, { selectSearch: isSelectSearch }]"
-    :style="
-      isSelectSearch ? { top: barVisible ? '2px' : '-50px' } : undefined
-    "
+    :class="[
+      containerClass,
+      { selectSearch: isSelectSearch, 'sej-select-visible': barVisible },
+    ]"
+    :aria-hidden="isSelectSearch && !barVisible ? 'true' : undefined"
   >
     <template v-for="category in categories" :key="category.key">
       <template v-if="isFlatCategory(category) || inlineStyleBlocked">

@@ -25,6 +25,7 @@
   font-size: 16px;
   transition: 0.3s;
   opacity: 0;
+  animation: sej-setting-mask-in 0.3s ease;
   user-select: none;
   -moz-user-select: none;
   padding-bottom: 80px;
@@ -37,13 +38,15 @@
   flex-wrap: wrap;
   flex-wrap: nowrap;
   box-sizing: border-box;
-  padding: 20px 20px 50px 20px;
+  --sej-panel-pad-x: 20px;
+  --sej-panel-pad-top: 20px;
+  padding: var(--sej-panel-pad-top) var(--sej-panel-pad-x) 12px;
   margin: 2% 0 50px;
   background-color: var(--background-setting-qxin);
   border-radius: 8px;
   position: absolute;
   width: auto;
-  min-width: 700px;
+  min-width: min(700px, calc(100vw - 80px));
   max-width: calc(100vw - 80px);
   max-height: calc(100vh - 80px);
   margin: 0;
@@ -113,12 +116,12 @@
 }
 #btnEle2,
 #btnEle {
-  position: absolute;
+  position: relative;
   width: 100%;
-  bottom: 0px;
-  right: 0;
   background: var(--background-setting-qxin);
   border-radius: 8px;
+  flex: 0 0 auto;
+  margin-top: 8px;
 }
 #btnEle2 span,
 #btnEle span {
@@ -174,20 +177,22 @@
 #btnEle > div {
   width: 100%;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-around;
   background: var(--background-btn-qxin);
   border-radius: 4px;
+  box-sizing: border-box;
 }
 #btnEle2 {
-  visibility: hidden;
+  display: none;
   opacity: 0;
-  bottom: 52px !important;
-  transform: translate(0, 16px);
+  transform: translate(0, 8px);
   transition: 0.3s;
-  z-index: 2;
+  max-height: 40vh;
+  overflow-y: auto;
 }
 #btnEle2.btnEle2active {
-  visibility: visible;
+  display: block;
   opacity: 1;
   transform: translate(0, 0);
 }
@@ -368,34 +373,6 @@ span.iqxin-additem.iqxin-set-active {
   color: red;
   font-size: 1.2em;
 }
-#xin-close {
-  background: white;
-  color: #3abdc1;
-  line-height: 20px;
-  text-align: center;
-  height: 20px;
-  width: 20px;
-  text-align: center;
-  font-size: 20px;
-  padding: 10px;
-  border: 3px solid #3abdc1;
-  border-radius: 50%;
-  transition: 0.5s;
-  top: -20px;
-  right: -20px;
-  position: absolute;
-  box-sizing: unset;
-  cursor: pointer;
-}
-#xin-close::before {
-  content: "\2716";
-  margin: -10px;
-}
-#xin-close:hover {
-  background: indianred;
-  border-color: indianred;
-  color: #fff;
-}
 input#setBtnOpacityRange[type="range"] {
   outline: none;
   appearance: none;
@@ -543,12 +520,21 @@ body[qxintheme="dark"] {
 /* 滑词搜索样式 */
 #sej-container.selectSearch {
   position: fixed;
-  top: -50px;
+  top: 2px;
   left: 0;
   right: 0;
   z-index: 99999999;
-  transition: 0.3s;
   margin: 0 auto;
+  transform: translateY(calc(-100% - 10px));
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform 0.3s, visibility 0s linear 0.3s;
+}
+#sej-container.selectSearch.sej-select-visible {
+  transform: none;
+  visibility: visible;
+  pointer-events: auto;
+  transition: transform 0.3s, visibility 0s linear 0s;
 }
 #sej-expanded-category {
   font-weight: bold;
@@ -620,6 +606,11 @@ body[qxintheme="dark"] {
   border-color: var(--border-color-sej);
   user-select: none;
 }
+@keyframes sej-setting-mask-in {
+  from {
+    opacity: 0;
+  }
+}
 @keyframes sejopen {
   0% {
     transform: scale(1, 0.1);
@@ -655,7 +646,12 @@ body[qxintheme="dark"] {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-bottom: 110px;
+  /* 让滚动条贴住面板内边缘，而不是停在内容区的内边距处 */
+  margin-top: calc(var(--sej-panel-pad-top) * -1);
+  margin-right: calc(var(--sej-panel-pad-x) * -1);
+  padding-top: var(--sej-panel-pad-top);
+  padding-right: var(--sej-panel-pad-x);
+  padding-bottom: 12px;
 }
 #sej-settings-body::-webkit-scrollbar {
   width: 8px;
@@ -667,4 +663,16 @@ body[qxintheme="dark"] {
 #settingLayer #btnEle,
 #settingLayer #btnEle2 {
   flex: 0 0 auto;
+}
+
+@media (max-width: 780px) {
+  #btnEle span,
+  #btnEle2 span {
+    font-size: 12px;
+    padding: 3px 6px;
+    margin: 6px auto;
+  }
+  #settingLayer {
+    --sej-panel-pad-x: 12px;
+  }
 }

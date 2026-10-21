@@ -11,7 +11,6 @@ export const SCRIPT_MESSAGE =
   '(version: 若有新功能加入,靠这个版本号识别)...' +
   '(addSearchItems: 允许更新时,添加新的搜索网站到你的搜索列表)...' +
   '(modifySearchItems: 允许更新时,修改你的搜索列表中的项目)...' +
-  '(closeBtn: 设置页面右上角的“关闭”按钮是否显示。true显示,false隐藏)...' +
   '(newtab: 新标签页打开。0为默认设置,1为新标签页打开)...' +
   '(foldlist: 折叠当前搜索分类列表。true为折叠,false为展开。)...' +
   '(setBtnOpacity: 设置按钮的透明度,值为0-1之间的数,0为透明,1为完全显示,中间值半透明。注：-1为直接关闭按钮,关闭之前请确定自己知道如何再次打开它)...' +
@@ -37,7 +36,6 @@ function createDefaultSettings() {
     version: SCRIPT_VERSION,
     addSearchItems: true,
     modifySearchItems: true,
-    closeBtn: true,
     newtab: 0,
     foldlist: true,
     setBtnOpacity: 0.7,
@@ -212,6 +210,16 @@ export class Settings {
     }
 
     this.initEngineCategories();
+  }
+
+  // 原地应用新设置：保持 settingData 引用不变，供已挂载的组件响应
+  applySettings(next) {
+    const merged = Object.assign({}, this.scriptSettingData, next);
+    const plain = JSON.parse(JSON.stringify(merged));
+    Object.assign(this.settingData, plain);
+    this.storedSettingData = this.settingData;
+    this.initEngineCategories();
+    setValue(STORAGE_KEY, this.settingData);
   }
 
   initEngineCategories() {

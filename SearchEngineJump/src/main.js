@@ -4,8 +4,9 @@ import App from './App.vue';
 import globalCss from './assets/global.css?raw';
 import { initialize, getRoot, getHost, addStyle, reset } from './core/shadow.js';
 import { applyDarkModeIfNeeded, watchDarkModeChanges } from './core/darkMode.js';
+import { onRestartRequest } from './core/appControl.js';
 import { useSettings } from './stores/settings.js';
-import { openSettingPanel } from './stores/ui.js';
+import { openSettingPanel, closeSettingPanel } from './stores/ui.js';
 
 // 严格 CSP 页面的兼容样式
 const CSP_COMPAT_STYLE = `
@@ -30,9 +31,10 @@ const NON_TRANSITION_STYLE = `
 // 关闭设置面板动画（transtion: false）
 const SETTINGS_NON_TRANSITION_STYLE = `
   #settingLayer, #btnEle span, #btnEle2, .iqxin-set-del,
-  span.iqxin-additem, #newSearchBox, .addItemBoxBtn, #xin-close, #settingLayerMask {
+  span.iqxin-additem, #newSearchBox, .addItemBoxBtn, #settingLayerMask {
     transition: none;
   }
+  #settingLayerMask { animation: none; }
   #settingLayerMask { backdrop-filter: none; }
 `;
 
@@ -107,7 +109,11 @@ function boot() {
   app.mount(getRoot());
 
   if (!menuRegistered) {
-    GM_registerMenuCommand('设置菜单', openSettingPanel);
+    try {
+      GM_registerMenuCommand('设置菜单', openSettingPanel);
+    } catch (e) {
+      console.warn('[SEJ] 注册菜单命令失败', e);
+    }
     menuRegistered = true;
   }
 }
@@ -125,6 +131,21 @@ function startScript() {
   } else {
     boot();
   }
+}
+
+// 设置保存后原地重建脚本 DOM，避免刷新页面
+function restart() {
+  closeSettingPanel();
+  if (app) {
+    try {
+      app.unmount();
+    } catch (e) {
+      // ignore
+    }
+    app = null;
+  }
+  reset();
+  boot();
 }
 
 function normalizeURL(urlString) {
@@ -163,5 +184,6 @@ function listenUrlChange() {
   });
 }
 
+onRestartRequest(restart);
 startScript();
 listenUrlChange();

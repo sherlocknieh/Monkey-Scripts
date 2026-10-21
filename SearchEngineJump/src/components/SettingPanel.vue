@@ -9,7 +9,7 @@ import {
 } from 'vue';
 import { GM_deleteValue } from '$';
 import { useSettings, STORAGE_KEY } from '../stores/settings.js';
-import { getValue, setValue } from '../core/storage.js';
+import { requestRestart } from '../core/appControl.js';
 import { closeSettingPanel, showToast } from '../stores/ui.js';
 import { EDIT, DEL } from '../data/icons.js';
 import EngineEditDialog from './EngineEditDialog.vue';
@@ -25,7 +25,6 @@ const OPTION_KEYS = [
     'version',
     'addSearchItems',
     'modifySearchItems',
-    'closeBtn',
     'newtab',
     'foldlist',
     'setBtnOpacity',
@@ -65,6 +64,7 @@ function makeDraft() {
 
 const draft = reactive(makeDraft());
 const layerEl = ref(null);
+const maskEl = ref(null);
 const maskVisible = ref(false);
 const layerStyle = ref({});
 const addDelMode = ref(false);
@@ -124,11 +124,9 @@ function buildResult() {
 }
 
 function save() {
-    const stored = getValue(STORAGE_KEY, {}) || {};
-    const merged = Object.assign({}, stored, buildResult());
-    setValue(STORAGE_KEY, merged);
+    settings.applySettings(buildResult());
     showToast('保存成功');
-    setTimeout(() => location.reload(), 300);
+    setTimeout(requestRestart, 0);
 }
 
 function reset() {
@@ -138,9 +136,27 @@ function reset() {
     }
 }
 
+let closeTimer = null;
+let closed = false;
+
+function finishClose() {
+    if (closed) return;
+    closed = true;
+    clearTimeout(closeTimer);
+    closeTimer = null;
+    closeSettingPanel();
+}
+
+function onMaskTransitionEnd(e) {
+    if (e.target !== maskEl.value || e.propertyName !== 'opacity') return;
+    if (maskVisible.value) return;
+    finishClose();
+}
+
 function close() {
+    if (!maskVisible.value) return;
     maskVisible.value = false;
-    setTimeout(closeSettingPanel, 300);
+    closeTimer = setTimeout(finishClose, 400);
 }
 
 function toggleAddDel() {
@@ -319,8 +335,8 @@ function saveConfig(text) {
             alert('JSON 解析失败');
             return;
         }
-        setValue(STORAGE_KEY, parsed);
-        location.reload();
+        settings.applySettings(parsed);
+        setTimeout(requestRestart, 0);
     } else {
         reset();
     }
@@ -361,17 +377,15 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     document.body.style.overflow = 'auto';
+    clearTimeout(closeTimer);
     document.removeEventListener('mousemove', onDragMove);
     document.removeEventListener('mouseup', stopDrag);
 });
 </script>
 
 <template>
-    <div id="settingLayerMask" :style="{ display: 'flex', opacity: maskVisible ? 1 : 0 }" @click.self="close">
-        <div id="settingLayer" ref="layerEl" :style="[
-            { transform: maskVisible ? 'none' : 'translateY(-20%)' },
-            layerStyle,
-        ]" @click.stop>
+    <div id="settingLayerMask" ref="maskEl" :style="{ display: 'flex', opacity: maskVisible ? 1 : 0 }" @click.self="close" @transitionend="onMaskTransitionEnd">
+        <div id="settingLayer" ref="layerEl" :style="layerStyle" @click.stop>
             <div id="dragDom" style="
           height: 16px;
           width: 97%;
@@ -515,8 +529,6 @@ onBeforeUnmount(() => {
           opacity: 0;
           transition: 0.3s;
         " @click="openCategoryDialog">增加新的搜索列表</span>
-
-            <span v-if="draft.closeBtn" id="xin-close" title="close 关闭" @click="close"></span>
 
             <EngineEditDialog v-if="engineDialog" :mode="engineDialog.mode" :initial="engineDialog.initial"
                 :resolve-icon="getICON" @submit="submitEngine" @cancel="engineDialog = null" />

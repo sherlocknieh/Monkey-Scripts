@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SearchEngineJump++
 // @namespace    npm/vite-plugin-monkey
-// @version      2026.10.19.05
+// @version      2026.10.22.01
 // @author       NLF & 锐经 & iqxin & MUTED64
 // @description  Fork 版本搜索引擎跳转脚本，Vue 重构版。在搜索页插入跳转小横条，支持划词搜索、分类下拉、设置菜单等。
 // @license      MIT
@@ -7038,7 +7038,7 @@
 	var TIEBA = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGNsYXNzPSJpY29uIiB2aWV3Qm94PSIwIDAgMTAyNCAxMDI0IiB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCI+PHBhdGggZD0iTTc1MC4zNTEgNTQxLjA1Nkg2MDAuODI3djIxNC40NjdoMTE1LjUyMmMzNS40NTYgMCAzNC4wMDItNDEuMTI0IDM0LjAwMi00MS4xMjRWNTQxLjA1NnoiIGZpbGw9IiMyNDgyRkQiLz48cGF0aCBkPSJNODQ5LjkyIDUxLjJIMTc0LjA4Yy02Ny44NjYgMC0xMjIuODggNTUuMDE0LTEyMi44OCAxMjIuODh2Njc1Ljg0YzAgNjcuODY2IDU1LjAxNCAxMjIuODggMTIyLjg4IDEyMi44OGg2NzUuODRjNjcuODY2IDAgMTIyLjg4LTU1LjAxNCAxMjIuODgtMTIyLjg4VjE3NC4wOGMwLTY3Ljg2Ni01NS4wMTQtMTIyLjg4LTEyMi44OC0xMjIuODh6bS0zNTguNzA3IDc2OGMtOTcuNTk4IDAtMTQxLjU5OS03My4yNTItMTQxLjU5OS03My4yNTItNTEuODUgODAuNDQtMTQxLjU5NCA3My4wNzMtMTQxLjU5NCA3My4wNzN2LTYzLjUwNGMxMDguNzI5IDAgMTA4Ljc4LTEwNy4yMjggMTA4Ljc4LTEwNy4yMjhWMzE3LjQ2Nmg2NS42MjN2MzMwLjgyM2MwIDEwMi45MDcgMTA4Ljc4NSAxMDcuMjI4IDEwOC43ODUgMTA3LjIyOFY4MTkuMnptMC02MDguNTg0VjY1OC4zNUg0MjUuNTlWMjczLjM4OEgzMTQuNDM1Yy00MS41MjkgMC00MC43ODEgMzMuMTM2LTQwLjc4MSAzMy4xMzZWNjU4LjM0aC02NS42MjhWMzA2LjUzYzAtOTguMDg1IDEwNi40MDMtOTYuNjQgMTA2LjQwMy05Ni42NGgxNzYuNzg0di43MjZ6bTMyNC43NjEgNTAzLjc3OGMwIDEwMy45MTUtOTkuNjI1IDEwNC42MzItOTkuNjI1IDEwNC42MzJINTM1LjIwNFY0NzcuNTU4aDYwLjUxOFYyMDQuOGg2NS42MjN2NjcuODU1aDE1NC41MzJ2NjcuNzM4SDY2MS4zNDV2MTM3LjE2aDE1NC42M3YyMzYuODR6IiBmaWxsPSIjMjQ4MkZEIi8+PC9zdmc+";
 	var STORAGE_KEY = "searchEngineJumpData";
 	var SCRIPT_VERSION = "5.32.7";
-	var SCRIPT_MESSAGE = "$相关说明$(status: 这个在将来或许很重要)...(version: 若有新功能加入,靠这个版本号识别)...(addSearchItems: 允许更新时,添加新的搜索网站到你的搜索列表)...(modifySearchItems: 允许更新时,修改你的搜索列表中的项目)...(closeBtn: 设置页面右上角的“关闭”按钮是否显示。true显示,false隐藏)...(newtab: 新标签页打开。0为默认设置,1为新标签页打开)...(foldlist: 折叠当前搜索分类列表。true为折叠,false为展开。)...(setBtnOpacity: 设置按钮的透明度,值为0-1之间的数,0为透明,1为完全显示,中间值半透明。注：-1为直接关闭按钮,关闭之前请确定自己知道如何再次打开它)...(debug: debug模式,开启后,控制台会输出一些信息,“关闭并保存”按钮将不会在刷新页面)...(fixedTop: 将搜索栏固定到顶端。 true开启,false关闭)...(fixedTopUpward: 固定顶端后，搜索栏下拉不会出现，只有上拉时才出现。 true开启,false关闭)...(baiduOffset: 在百度页面鼠标划过的菜单会出现位移,若有使用其他的style样式,可以修改这个来修复二级菜单的偏移)...(getIcon: 自己添加搜索后获取图标的方式。0为自动，能连接谷歌的情况下用谷歌获取，无法连接的情况下，域名加favicon.ico获取；1为域名加favicon获取，2为使用谷歌获取，3为使用dnspot的服务获取(不建议使用)。或者添加网址，关键字使用%s代替，未测试)...(allOpen:一键搜索，点击相关分类后，打开该分类下的所有搜索)...(HideTheSameLink:隐藏同站链接。默认开启,百度页面会隐藏百度搜索。如果想在同一个搜索网站,但是想通过不同语言来搜索, 可以选择false来实现)...(center:是否居中显示，主要是为了兼容脚本 ac 百度  ： 0 不居中，强制在左。 1, 强制居中 。 2,自动判断)...(icon: 图标的显示方式, 0 关闭文字, 只保留图标, 1 显示网站图标,2 显示抽象图标。当脚本中不存在抽象图标时,显示网站图标)...(transtion: 是否有动画效果, true为开启所有动画效果,false关闭所有动画(包括模糊效果)。)(selectSearch: 划词搜索功能, true为开启划词搜索,false关闭)(engineDetails: 第一个值为分类列表标题名称,第二个值与enginelist相关联,必须匹配,第三个值true为显示列表,false为禁用列表。排列顺序与跳转栏上的显示顺序相同，可以用它将分类列表按自己喜欢排序)...(engineList: 各个搜索的相关信息)(rules: 已弃用--将搜索样式插入到目标网页,同脚本中的rules设置相同,优先级高于脚本中自带的规则。自带了360搜索,可仿写)...";
+	var SCRIPT_MESSAGE = "$相关说明$(status: 这个在将来或许很重要)...(version: 若有新功能加入,靠这个版本号识别)...(addSearchItems: 允许更新时,添加新的搜索网站到你的搜索列表)...(modifySearchItems: 允许更新时,修改你的搜索列表中的项目)...(newtab: 新标签页打开。0为默认设置,1为新标签页打开)...(foldlist: 折叠当前搜索分类列表。true为折叠,false为展开。)...(setBtnOpacity: 设置按钮的透明度,值为0-1之间的数,0为透明,1为完全显示,中间值半透明。注：-1为直接关闭按钮,关闭之前请确定自己知道如何再次打开它)...(debug: debug模式,开启后,控制台会输出一些信息,“关闭并保存”按钮将不会在刷新页面)...(fixedTop: 将搜索栏固定到顶端。 true开启,false关闭)...(fixedTopUpward: 固定顶端后，搜索栏下拉不会出现，只有上拉时才出现。 true开启,false关闭)...(baiduOffset: 在百度页面鼠标划过的菜单会出现位移,若有使用其他的style样式,可以修改这个来修复二级菜单的偏移)...(getIcon: 自己添加搜索后获取图标的方式。0为自动，能连接谷歌的情况下用谷歌获取，无法连接的情况下，域名加favicon.ico获取；1为域名加favicon获取，2为使用谷歌获取，3为使用dnspot的服务获取(不建议使用)。或者添加网址，关键字使用%s代替，未测试)...(allOpen:一键搜索，点击相关分类后，打开该分类下的所有搜索)...(HideTheSameLink:隐藏同站链接。默认开启,百度页面会隐藏百度搜索。如果想在同一个搜索网站,但是想通过不同语言来搜索, 可以选择false来实现)...(center:是否居中显示，主要是为了兼容脚本 ac 百度  ： 0 不居中，强制在左。 1, 强制居中 。 2,自动判断)...(icon: 图标的显示方式, 0 关闭文字, 只保留图标, 1 显示网站图标,2 显示抽象图标。当脚本中不存在抽象图标时,显示网站图标)...(transtion: 是否有动画效果, true为开启所有动画效果,false关闭所有动画(包括模糊效果)。)(selectSearch: 划词搜索功能, true为开启划词搜索,false关闭)(engineDetails: 第一个值为分类列表标题名称,第二个值与enginelist相关联,必须匹配,第三个值true为显示列表,false为禁用列表。排列顺序与跳转栏上的显示顺序相同，可以用它将分类列表按自己喜欢排序)...(engineList: 各个搜索的相关信息)(rules: 已弃用--将搜索样式插入到目标网页,同脚本中的rules设置相同,优先级高于脚本中自带的规则。自带了360搜索,可仿写)...";
 	function createDefaultSettings() {
 		return {
 			status: 1,
@@ -7046,7 +7046,6 @@
 			version: SCRIPT_VERSION,
 			addSearchItems: true,
 			modifySearchItems: true,
-			closeBtn: true,
 			newtab: 0,
 			foldlist: true,
 			setBtnOpacity: .7,
@@ -7202,6 +7201,14 @@
 				setValue(STORAGE_KEY, this.settingData);
 			}
 			this.initEngineCategories();
+		}
+		applySettings(next) {
+			const merged = Object.assign({}, this.scriptSettingData, next);
+			const plain = JSON.parse(JSON.stringify(merged));
+			Object.assign(this.settingData, plain);
+			this.storedSettingData = this.settingData;
+			this.initEngineCategories();
+			setValue(STORAGE_KEY, this.settingData);
 		}
 		initEngineCategories() {
 			this.settingData.engineList.engineCategories = [];
@@ -15142,7 +15149,8 @@
 			};
 		}
 	};
-	var _hoisted_1$4 = {
+	var _hoisted_1$4 = ["aria-hidden"];
+	var _hoisted_2$2 = {
 		key: 0,
 		class: "sej-category-title"
 	};
@@ -15296,10 +15304,13 @@
 					ref_key: "containerEl",
 					ref: containerEl,
 					id: "sej-container",
-					class: normalizeClass([containerClass.value, { selectSearch: isSelectSearch.value }]),
-					style: normalizeStyle(isSelectSearch.value ? { top: barVisible.value ? "2px" : "-50px" } : void 0)
+					class: normalizeClass([containerClass.value, {
+						selectSearch: isSelectSearch.value,
+						"sej-select-visible": barVisible.value
+					}]),
+					"aria-hidden": isSelectSearch.value && !barVisible.value ? "true" : void 0
 				}, [(openBlock(true), createElementBlock(Fragment, null, renderList(categories.value, (category) => {
-					return openBlock(), createElementBlock(Fragment, { key: category.key }, [isFlatCategory(category) || unref(inlineStyleBlocked) ? (openBlock(), createElementBlock(Fragment, { key: 0 }, [unref(inlineStyleBlocked) ? (openBlock(), createElementBlock("span", _hoisted_1$4, toDisplayString(category.name), 1)) : createCommentVNode("", true), (openBlock(true), createElementBlock(Fragment, null, renderList(category.engines, (engine) => {
+					return openBlock(), createElementBlock(Fragment, { key: category.key }, [isFlatCategory(category) || unref(inlineStyleBlocked) ? (openBlock(), createElementBlock(Fragment, { key: 0 }, [unref(inlineStyleBlocked) ? (openBlock(), createElementBlock("span", _hoisted_2$2, toDisplayString(category.name), 1)) : createCommentVNode("", true), (openBlock(true), createElementBlock(Fragment, null, renderList(category.engines, (engine) => {
 						return openBlock(), createBlock(_sfc_main$9, {
 							key: engine.url + engine.name,
 							engine,
@@ -15320,10 +15331,17 @@
 						"all-open",
 						"onJumpAll"
 					]))], 64);
-				}), 128)), createVNode(_sfc_main$7)], 6)) : createCommentVNode("", true);
+				}), 128)), createVNode(_sfc_main$7)], 10, _hoisted_1$4)) : createCommentVNode("", true);
 			};
 		}
 	};
+	var restartHandler = null;
+	function onRestartRequest(handler) {
+		restartHandler = handler;
+	}
+	function requestRestart() {
+		if (restartHandler) restartHandler();
+	}
 	var _hoisted_1$3 = { id: "newSearchBox" };
 	var _hoisted_2$1 = { key: 0 };
 	var _sfc_main$5 = {
@@ -15620,7 +15638,6 @@
 				"version",
 				"addSearchItems",
 				"modifySearchItems",
-				"closeBtn",
 				"newtab",
 				"foldlist",
 				"setBtnOpacity",
@@ -15657,6 +15674,7 @@
 			}
 			const draft = reactive(makeDraft());
 			const layerEl = ref(null);
+			const maskEl = ref(null);
 			const maskVisible = ref(false);
 			const layerStyle = ref({});
 			const addDelMode = ref(false);
@@ -15708,10 +15726,9 @@
 				return result;
 			}
 			function save() {
-				const stored = getValue("searchEngineJumpData", {}) || {};
-				setValue(STORAGE_KEY, Object.assign({}, stored, buildResult()));
+				settings.applySettings(buildResult());
 				showToast("保存成功");
-				setTimeout(() => location.reload(), 300);
+				setTimeout(requestRestart, 0);
 			}
 			function reset() {
 				if (confirm("将会删除用户设置！")) {
@@ -15719,9 +15736,24 @@
 					location.reload();
 				}
 			}
+			let closeTimer = null;
+			let closed = false;
+			function finishClose() {
+				if (closed) return;
+				closed = true;
+				clearTimeout(closeTimer);
+				closeTimer = null;
+				closeSettingPanel();
+			}
+			function onMaskTransitionEnd(e) {
+				if (e.target !== maskEl.value || e.propertyName !== "opacity") return;
+				if (maskVisible.value) return;
+				finishClose();
+			}
 			function close() {
+				if (!maskVisible.value) return;
 				maskVisible.value = false;
-				setTimeout(closeSettingPanel, 300);
+				closeTimer = setTimeout(finishClose, 400);
 			}
 			function toggleAddDel() {
 				addDelMode.value = !addDelMode.value;
@@ -15877,8 +15909,8 @@
 						alert("JSON 解析失败");
 						return;
 					}
-					setValue(STORAGE_KEY, parsed);
-					location.reload();
+					settings.applySettings(parsed);
+					setTimeout(requestRestart, 0);
 				} else reset();
 			}
 			const dragging = ref(false);
@@ -15917,22 +15949,26 @@
 			});
 			onBeforeUnmount(() => {
 				document.body.style.overflow = "auto";
+				clearTimeout(closeTimer);
 				document.removeEventListener("mousemove", onDragMove);
 				document.removeEventListener("mouseup", stopDrag);
 			});
 			return (_ctx, _cache) => {
 				return openBlock(), createElementBlock("div", {
 					id: "settingLayerMask",
+					ref_key: "maskEl",
+					ref: maskEl,
 					style: normalizeStyle({
 						display: "flex",
 						opacity: maskVisible.value ? 1 : 0
 					}),
-					onClick: withModifiers(close, ["self"])
+					onClick: withModifiers(close, ["self"]),
+					onTransitionend: onMaskTransitionEnd
 				}, [createBaseVNode("div", {
 					id: "settingLayer",
 					ref_key: "layerEl",
 					ref: layerEl,
-					style: normalizeStyle([{ transform: maskVisible.value ? "none" : "translateY(-20%)" }, layerStyle.value]),
+					style: normalizeStyle(layerStyle.value),
 					onClick: _cache[18] || (_cache[18] = withModifiers(() => {}, ["stop"]))
 				}, [
 					createBaseVNode("div", {
@@ -16166,14 +16202,8 @@
 						},
 						onClick: openCategoryDialog
 					}, "增加新的搜索列表", 2),
-					draft.closeBtn ? (openBlock(), createElementBlock("span", {
-						key: 0,
-						id: "xin-close",
-						title: "close 关闭",
-						onClick: close
-					})) : createCommentVNode("", true),
 					engineDialog.value ? (openBlock(), createBlock(_sfc_main$5, {
-						key: 1,
+						key: 0,
 						mode: engineDialog.value.mode,
 						initial: engineDialog.value.initial,
 						"resolve-icon": getICON,
@@ -16181,19 +16211,19 @@
 						onCancel: _cache[14] || (_cache[14] = ($event) => engineDialog.value = null)
 					}, null, 8, ["mode", "initial"])) : createCommentVNode("", true),
 					categoryDialog.value ? (openBlock(), createBlock(_sfc_main$4, {
-						key: 2,
+						key: 1,
 						onSubmit: submitCategory,
 						onCancel: _cache[15] || (_cache[15] = ($event) => categoryDialog.value = false)
 					})) : createCommentVNode("", true),
 					configOpen.value ? (openBlock(), createBlock(_sfc_main$3, {
-						key: 3,
+						key: 2,
 						"initial-text": configText.value,
 						onSave: saveConfig,
 						onReset: reset,
 						onClose: _cache[16] || (_cache[16] = ($event) => configOpen.value = false),
 						onCopy: _cache[17] || (_cache[17] = ($event) => unref(showToast)("复制成功"))
 					}, null, 8, ["initial-text"])) : createCommentVNode("", true)
-				], 4)], 4);
+				], 4)], 36);
 			};
 		}
 	};
@@ -16220,7 +16250,7 @@
 			};
 		}
 	};
-	var global_default = "/* ==UserStyle==\n@name           SearchEngineJumpPlusGlobalStyle\n@description    Global style for SearchEngineJumpPlus\n@version        5.32.0\n@namespace      https://greasyfork.org/en/scripts/454280-searchenginejumpplus\n@license        MIT\n@author         MUTED64\n==/UserStyle== */\n\n#settingLayerMask {\n  display: none;\n  justify-content: center;\n  align-items: center;\n  position: fixed;\n  top: 0;\n  right: 0;\n  bottom: 0;\n  left: 0;\n  background-color: rgba(0, 0, 0, 0.3);\n  backdrop-filter: blur(10px);\n  z-index: 200000000;\n  overflow: auto;\n  font-family: sans-serif;\n  min-height: 100%;\n  font-size: 16px;\n  transition: 0.3s;\n  opacity: 0;\n  user-select: none;\n  -moz-user-select: none;\n  padding-bottom: 80px;\n  box-sizing: border-box;\n  color: var(--font-color-qxin);\n}\n#settingLayer {\n  display: flex;\n  flex-direction: column;\n  flex-wrap: wrap;\n  flex-wrap: nowrap;\n  box-sizing: border-box;\n  padding: 20px 20px 50px 20px;\n  margin: 2% 0 50px;\n  background-color: var(--background-setting-qxin);\n  border-radius: 8px;\n  position: absolute;\n  width: auto;\n  min-width: 700px;\n  max-width: calc(100vw - 80px);\n  max-height: calc(100vh - 80px);\n  margin: 0;\n  overflow: visible;\n}\n.iqxin-items {\n  min-width: 5em;\n  margin: 0 2px 0px;\n}\n#settingLayer .drag {\n  display: block;\n  position: relative;\n}\n#settingLayer .sej-engine {\n  padding: 0 calc(0.3em + 26px) 0 0.7em;\n  width: 100%;\n  box-sizing: border-box;\n}\n.iqxin-pointer-events,\n.sej-engine-icon,\n#settingLayer .sej-engine * {\n  pointer-events: none;\n}\n.sejtitle {\n  text-align: center;\n  padding: 2px 0;\n  cursor: pointer;\n  position: relative;\n  line-height: 1.8;\n}\n#settingLayerMask [data-xin] {\n  margin: 2px 0;\n  border-radius: 4px;\n}\n#settingLayerMask .iqxin-set-edit,\n#settingLayerMask .iqxin-set-del,\n#settingLayerMask .iqxin-title-edit {\n  border-radius: 4px;\n  line-height: 1em;\n  margin-right: 0.3em;\n}\n.sejcon [data-xin] {\n  cursor: pointer;\n}\n#settingLayerMask [data-iqxindisabled=\"true\"],\n[data-xin^=\"-\"] {\n  background-color: var(--background-avtive-color-qxin);\n  text-decoration: line-through !important;\n  text-decoration-color: red !important;\n  transition: 0.3s;\n}\n.sejtitle:not([data-xin^=\"-\"]):hover {\n  background: var(--background-active-enable-qxin);\n}\n#settingLayerMask .sej-engine:hover {\n  background-color: var(--background-active-enable-qxin);\n}\n#settingLayerMask [data-iqxindisabled=\"true\"]:hover,\n[data-xin^=\"-\"]:hover {\n  background-color: var(--background-active-disable-qxin);\n}\n#settingLayerMask label {\n  cursor: pointer;\n}\n#settingLayerMask .sej-engine-icon {\n  vertical-align: middle;\n}\n#btnEle2,\n#btnEle {\n  position: absolute;\n  width: 100%;\n  bottom: 0px;\n  right: 0;\n  background: var(--background-setting-qxin);\n  border-radius: 8px;\n}\n#btnEle2 span,\n#btnEle span {\n  display: inline-block;\n  background: var(--background-btn-qxin);\n  border: 1px solid #3abdc1;\n  margin: 12px auto 10px;\n  color: #3abdc1;\n  padding: 5px 10px;\n  border-radius: 4px;\n  cursor: pointer;\n  outline: none;\n  transition: 0.3s;\n}\n#btnEle label,\n#btnEle2 label {\n  color: #3abdc1;\n}\n#btnEle span:hover label,\n#btnEle2 span:hover label {\n  color: #fff;\n}\n#btnEle a {\n  color: #999;\n  text-decoration: none;\n  font-family: auto;\n}\n#btnEle a:hover {\n  text-decoration: none;\n  color: #ef8957;\n}\n#btnEle2 span.feedback:hover,\n#btnEle span.feedback:hover {\n  border-color: #ef8957;\n}\n#btnEle2 span:not(.feedback):hover,\n#btnEle span:not(.feedback):hover,\n#btnEle2 span:not(.feedback):hover select,\n#btnEle span:not(.feedback):hover select {\n  background: #3acbdd;\n  color: #fff;\n}\n#btnEle2 span:not(.feedback) option,\n#btnEle span:not(.feedback) option {\n  background: var(--background-btn-qxin);\n  color: var(--font-color-qxin);\n}\n#btnEle .feedback {\n  text-decoration: none;\n  border-color: #aaa;\n}\n#btnEle2 > div,\n#btnEle > div {\n  width: 100%;\n  display: flex;\n  justify-content: space-around;\n  background: var(--background-btn-qxin);\n  border-radius: 4px;\n}\n#btnEle2 {\n  visibility: hidden;\n  opacity: 0;\n  bottom: 52px !important;\n  transform: translate(0, 16px);\n  transition: 0.3s;\n  z-index: 2;\n}\n#btnEle2.btnEle2active {\n  visibility: visible;\n  opacity: 1;\n  transform: translate(0, 0);\n}\n#settingLayerMask input[type=\"checkbox\"] {\n  width: 12px;\n  height: 12px;\n  display: inline-block;\n  text-align: center;\n  vertical-align: middle;\n  line-height: 10px !important;\n  margin: 0 5px 5px 5px !important;\n  position: relative;\n}\n#settingLayerMask input[type=\"checkbox\"]:before {\n  content: \"\";\n  position: absolute;\n  top: 0;\n  left: 0;\n  background: #fff;\n  width: 100%;\n  height: 100%;\n  border: 1px solid #d9d9d9;\n}\n#settingLayerMask input[type=\"checkbox\"]:checked:after {\n  content: \"✔\";\n  background-color: #63d4d8;\n  position: absolute;\n  top: 0;\n  left: 0;\n  width: 12px;\n  height: 12px;\n  border: 1px solid #63d4d8;\n  color: #fff;\n  font-size: 10px;\n}\n.drop-over {\n  opacity: 0.6;\n}\n.iqxin-title-edit,\n.iqxin-set-edit,\n.iqxin-set-title-del,\n.iqxin-set-del {\n  visibility: hidden;\n  opacity: 0;\n  position: absolute;\n  background: rgba(207, 249, 255, 0.86);\n  color: red;\n  top: 50%;\n  transform: translate(0, -50%);\n  right: 0;\n  padding: 3px 3px 4.5px 4.5px;\n  border-radius: 4px;\n  cursor: pointer;\n  transition: 0.3s;\n}\n.iqxin-set-title-del.iqxin-set-active {\n  background: #fff;\n  border-radius: 4px 0 0 4px;\n}\nspan.iqxin-additem {\n  display: inline-block;\n  text-align: center;\n  width: 100%;\n  margin: 10px 0;\n  border: 1px dotted red;\n  color: red;\n  cursor: pointer;\n  visibility: hidden;\n  opacity: 0;\n  transition: 0.3s;\n  transform: scale(0);\n}\nspan.iqxin-additem.iqxin-set-active {\n  visibility: visible;\n  opacity: 1;\n  margin: 10px 0;\n  transform: scale(1);\n}\n#settingLayer .sejtitle:hover .iqxin-title-edit,\n#settingLayer .sejcon > span:hover .iqxin-set-edit {\n  visibility: visible;\n  opacity: 0.8;\n}\n#nSearchList.iqxin-set-active,\n.iqxin-set-edit.iqxin-set-active,\n.iqxin-set-title-del.iqxin-set-active,\n.iqxin-set-del.iqxin-set-active {\n  visibility: visible !important;\n  opacity: 1 !important;\n}\n#btnEle span.iqxin-btn-active {\n  color: red;\n  border-color: red;\n}\n#newSearchListBox,\n#newSearchBox {\n  transition: 0.3s;\n  transform: translateY(0%);\n  opacity: 1;\n  position: fixed;\n  z-index: 200000100;\n  top: 50%;\n  left: 50%;\n  padding: 22px;\n  background: rgb(29, 29, 29);\n  border-radius: 4px;\n  color: #e8e8e8;\n  margin: -149px -117px;\n}\n#newSearchListBox input,\n#newSearchBox input {\n  border: none;\n  padding: 4px 0 4px 5px;\n  border-radius: 4px;\n  outline: none;\n}\n#newSearchBox #iqxin-newTarget {\n  border-radius: 4px;\n  border: none;\n  padding: 2px 0 2px 2px;\n}\n.iqxin-help-link {\n  color: #999;\n}\n#newSearchListBox input:focus,\n#newSearchBox input:focus {\n  background: #f1d2d2;\n  transition: 0.5s;\n}\n.addItemBoxBtn {\n  cursor: pointer;\n  background: #fff;\n  border: none;\n  border-radius: 4px;\n  padding: 4px 10px;\n  color: #333;\n  transition: 0.3s;\n}\n#xin-centerDisplay select,\n#xin-newtab select {\n  height: auto;\n  border: none;\n  outline: none;\n  color: #3abdc1;\n  font-size: 1em;\n  font-family: sans-serif;\n  padding: 0px 5px;\n  cursor: pointer;\n  text-decoration: none;\n  background: var(--background-btn-qxin);\n  transition: 0.3s;\n}\n#titleEdit {\n  width: 6em;\n}\n.iqxin-closeBtn,\n.iqxin-enterBtn {\n  box-sizing: border-box;\n}\n.iqxin-closeBtn:hover {\n  background: #ff6565;\n  border-color: #ff6565;\n  color: #fff;\n}\n.iqxin-enterBtn:hover {\n  background: #84bb84;\n  border-color: #84bb84;\n  color: #fff;\n}\n#iqxin-editCodeBox button {\n  cursor: pointer;\n}\n#iqxin-editCodeBox textarea {\n  overflow: auto;\n  border-radius: 4px;\n}\n.iqxin-warning {\n  color: red;\n  font-size: 1.2em;\n}\n#xin-close {\n  background: white;\n  color: #3abdc1;\n  line-height: 20px;\n  text-align: center;\n  height: 20px;\n  width: 20px;\n  text-align: center;\n  font-size: 20px;\n  padding: 10px;\n  border: 3px solid #3abdc1;\n  border-radius: 50%;\n  transition: 0.5s;\n  top: -20px;\n  right: -20px;\n  position: absolute;\n  box-sizing: unset;\n  cursor: pointer;\n}\n#xin-close::before {\n  content: \"\\2716\";\n  margin: -10px;\n}\n#xin-close:hover {\n  background: indianred;\n  border-color: indianred;\n  color: #fff;\n}\ninput#setBtnOpacityRange[type=\"range\"] {\n  outline: none;\n  appearance: none;\n  background: -webkit-linear-gradient(left, #3abdc1, #83e7ea) no-repeat, #fff;\n  border-radius: 10px; /*这个属性设置使填充进度条时的图形为圆角*/\n}\n.iqxin-setBtnOpacityRangeValue {\n  display: inline-block;\n  width: 3em;\n  text-align: center;\n}\ninput#setBtnOpacityRange[type=\"range\"]::-webkit-slider-thumb {\n  appearance: none;\n}\ninput#setBtnOpacityRange[type=\"range\"]::-webkit-slider-runnable-track {\n  height: 10px;\n  border-radius: 10px; /*将轨道设为圆角的*/\n  box-shadow: 0 1px 1px #def3f8, inset 0 0.125em 0.125em #0d1112; /*轨道内置阴影效果*/\n}\ninput#setBtnOpacityRange[type=\"range\"]::-webkit-slider-thumb {\n  appearance: none;\n  height: 18px;\n  width: 18px;\n  margin-top: -5px; /*使滑块超出轨道部分的偏移量相等*/\n  background: #fff;\n  border-radius: 50%; /*外观设置为圆形*/\n  border: solid 0.125em rgba(205, 224, 230, 0.5); /*设置边框*/\n  box-shadow: 0 0.125em 0.125em #3b4547; /*添加底部阴影*/\n}\n#importingBox {\n  position: fixed;\n  width: 350px;\n  top: 50%;\n  left: 50%;\n  transform: translate(-50%, -50%);\n  padding: 15px 30px;\n  border-radius: 4px;\n  background: #1d1d1d;\n  color: #fff;\n}\n#importingBox li {\n  margin: 5px;\n  border-bottom: 1px solid #3acbdd;\n}\n#importingBox li p {\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  margin-top: 0;\n  margin-bottom: 0;\n}\n.xin-importing-item {\n  cursor: pointer;\n}\n#setBtn {\n  transition: 0.5s;\n  padding: 0 1em;\n  height: 2.6em;\n  align-items: center;\n  cursor: pointer;\n  display: flex;\n}\nspan#setBtn:hover {\n  opacity: 1;\n  background-color: var(--background-hover-color-qxin);\n}\n#sej-container {\n  display: flex;\n  align-items: center;\n  position: relative;\n  z-index: 2;\n  padding: 0;\n  font-size: 13px;\n  font-family: sans-serif;\n  transform-origin: top center;\n  animation: sejopen 0.3s;\n  color: var(--font-color-qxin);\n  background: var(--background-color-qxin);\n  backdrop-filter: blur(40px);\n  width: max-content !important;\n  max-width: 100%;\n  box-sizing: border-box;\n  border-radius: 8px;\n  border-width: thin;\n  border-style: solid;\n  border-color: var(--border-color-sej);\n  overflow: auto;\n  box-shadow: 0 0 0.6em var(--box-shadow-color-sej);\n  height: fit-content;\n  flex-wrap: wrap;\n  justify-content: center;\n  user-select: none;\n}\n/* 给用户的提示 */\n#iqixn-global-tip {\n  box-sizing: content-box !important;\n  opacity: 0;\n  height: 25px;\n  line-height: 25px;\n  letter-spacing: 1px;\n  font-size: 14px;\n  color: #fff;\n  padding: 5px 20px;\n  border-radius: 8px;\n  background-color: #666;\n  position: fixed;\n  z-index: 200000001;\n  left: 50%;\n  bottom: 5%;\n  transform: translate(-50%);\n  transition: 0.4s;\n}\n/* 夜间模式 - 默认主题变量 */\n:root,\n:host,\nbody {\n  --font-color-qxin: #333;\n  --background-color-qxin: #fffffff0;\n  --background-avtive-color-qxin: #ccc;\n  --background-active-enable-qxin: #cff9ff;\n  --background-active-disable-qxin: #ffa2a2;\n  --background-hover-color-qxin: #eaeaea;\n  --trigger-shown-qxin: #deedff !important;\n  --background-btn-qxin: #eff4f8;\n  --background-setting-qxin: #fff;\n  --box-shadow-color-sej: hsla(0, 0%, 0%, 7%);\n  --border-color-sej: #e1e6ea;\n}\n/* 暗黑模式变量 - 当主文档是暗黑模式时 */\n:root[qxintheme=\"dark\"],\n:host[qxintheme=\"dark\"],\nbody[qxintheme=\"dark\"] {\n  --font-color-qxin: #bdc1bc;\n  --background-color-qxin: #202124f0;\n  --background-avtive-color-qxin: #424242;\n  --background-active-enable-qxin: #274144;\n  --background-active-disable-qxin: #583535;\n  --background-hover-color-qxin: #424242;\n  --trigger-shown-qxin: #424242 !important;\n  --background-btn-qxin: #292f36;\n  --background-setting-qxin: #202124;\n  --box-shadow-color-sej: hsla(0, 0%, 70%, 10%);\n  --border-color-sej: #3b4547;\n}\n/* 滑词搜索样式 */\n#sej-container.selectSearch {\n  position: fixed;\n  top: -50px;\n  left: 0;\n  right: 0;\n  z-index: 99999999;\n  transition: 0.3s;\n  margin: 0 auto;\n}\n#sej-expanded-category {\n  font-weight: bold;\n}\n.sej-category-title {\n  font-weight: 600;\n  padding: 0 8px;\n  opacity: 0.8;\n}\n.sej-engine {\n  padding: 0 13px;\n  transition: background-color 0.2s ease-out;\n  font-size: 13px;\n  font-family: sans-serif;\n  display: inline-flex;\n  gap: 8px;\n  align-items: center;\n  height: 2.6em;\n  text-decoration: none !important;\n  color: var(--font-color-qxin) !important;\n  cursor: pointer;\n}\n.sej-drop-list a:visited,\n.sej-drop-list a:hover,\n.sej-engine a:visited,\n.sej-engine a:hover,\n#sej-container a:link,\n#sej-container a:visited,\n#sej-container a:hover {\n  color: var(--font-color-qxin);\n}\n.sej-engine:hover {\n  background-color: var(--background-hover-color-qxin);\n}\n.sej-drop-list > .sej-engine {\n  display: flex;\n  justify-content: flex-start;\n}\n\n.sej-engine-icon {\n  width: 16px;\n  height: 16px;\n  object-fit: cover;\n  display: inline-block;\n  margin: 0;\n}\n.sej-engine-icon:not([src]) {\n  display: none;\n}\n\n.sej-drop-list {\n  /* 使用 fixed 定位确保在 Shadow DOM 中位置正确 */\n  position: fixed;\n  display: none;\n  opacity: 0.2;\n  top: -10000px;\n  left: 0;\n  min-width: 90px;\n  text-align: left;\n  font-size: 13px;\n  box-shadow: 0em 0.6em 0.6em var(--box-shadow-color-sej);\n  background-color: var(--background-color-qxin);\n  backdrop-filter: blur(40px);\n  transition: opacity 0.2s ease-out, top 0.2s ease-out;\n  overflow: hidden;\n  border-radius: 8px;\n  border-width: thin;\n  border-style: solid;\n  border-color: var(--border-color-sej);\n  user-select: none;\n}\n@keyframes sejopen {\n  0% {\n    transform: scale(1, 0.1);\n    opacity: 0;\n  }\n  100% {\n    transform: scale(1, 1);\n    opacity: 1;\n  }\n}\n@keyframes iqxinsejopen {\n  0% {\n    transform: scale(0.01, 0.01);\n    opacity: 0;\n  }\n  100% {\n    transform: scale(1, 1);\n    opacity: 1;\n  }\n}\n\n/* ---------- Vue 重构版设置面板布局优化 ---------- */\n#settingLayerMask {\n  padding: 20px;\n  box-sizing: border-box;\n}\n\n#sej-settings-body {\n  display: flex;\n  flex: 1 1 auto;\n  flex-wrap: wrap;\n  align-content: flex-start;\n  min-height: 0;\n  overflow-y: auto;\n  overflow-x: hidden;\n  padding-bottom: 110px;\n}\n#sej-settings-body::-webkit-scrollbar {\n  width: 8px;\n}\n#sej-settings-body::-webkit-scrollbar-thumb {\n  background: var(--background-avtive-color-qxin);\n  border-radius: 4px;\n}\n#settingLayer #btnEle,\n#settingLayer #btnEle2 {\n  flex: 0 0 auto;\n}\n";
+	var global_default = "/* ==UserStyle==\n@name           SearchEngineJumpPlusGlobalStyle\n@description    Global style for SearchEngineJumpPlus\n@version        5.32.0\n@namespace      https://greasyfork.org/en/scripts/454280-searchenginejumpplus\n@license        MIT\n@author         MUTED64\n==/UserStyle== */\n\n#settingLayerMask {\n  display: none;\n  justify-content: center;\n  align-items: center;\n  position: fixed;\n  top: 0;\n  right: 0;\n  bottom: 0;\n  left: 0;\n  background-color: rgba(0, 0, 0, 0.3);\n  backdrop-filter: blur(10px);\n  z-index: 200000000;\n  overflow: auto;\n  font-family: sans-serif;\n  min-height: 100%;\n  font-size: 16px;\n  transition: 0.3s;\n  opacity: 0;\n  animation: sej-setting-mask-in 0.3s ease;\n  user-select: none;\n  -moz-user-select: none;\n  padding-bottom: 80px;\n  box-sizing: border-box;\n  color: var(--font-color-qxin);\n}\n#settingLayer {\n  display: flex;\n  flex-direction: column;\n  flex-wrap: wrap;\n  flex-wrap: nowrap;\n  box-sizing: border-box;\n  --sej-panel-pad-x: 20px;\n  --sej-panel-pad-top: 20px;\n  padding: var(--sej-panel-pad-top) var(--sej-panel-pad-x) 12px;\n  margin: 2% 0 50px;\n  background-color: var(--background-setting-qxin);\n  border-radius: 8px;\n  position: absolute;\n  width: auto;\n  min-width: min(700px, calc(100vw - 80px));\n  max-width: calc(100vw - 80px);\n  max-height: calc(100vh - 80px);\n  margin: 0;\n  overflow: visible;\n}\n.iqxin-items {\n  min-width: 5em;\n  margin: 0 2px 0px;\n}\n#settingLayer .drag {\n  display: block;\n  position: relative;\n}\n#settingLayer .sej-engine {\n  padding: 0 calc(0.3em + 26px) 0 0.7em;\n  width: 100%;\n  box-sizing: border-box;\n}\n.iqxin-pointer-events,\n.sej-engine-icon,\n#settingLayer .sej-engine * {\n  pointer-events: none;\n}\n.sejtitle {\n  text-align: center;\n  padding: 2px 0;\n  cursor: pointer;\n  position: relative;\n  line-height: 1.8;\n}\n#settingLayerMask [data-xin] {\n  margin: 2px 0;\n  border-radius: 4px;\n}\n#settingLayerMask .iqxin-set-edit,\n#settingLayerMask .iqxin-set-del,\n#settingLayerMask .iqxin-title-edit {\n  border-radius: 4px;\n  line-height: 1em;\n  margin-right: 0.3em;\n}\n.sejcon [data-xin] {\n  cursor: pointer;\n}\n#settingLayerMask [data-iqxindisabled=\"true\"],\n[data-xin^=\"-\"] {\n  background-color: var(--background-avtive-color-qxin);\n  text-decoration: line-through !important;\n  text-decoration-color: red !important;\n  transition: 0.3s;\n}\n.sejtitle:not([data-xin^=\"-\"]):hover {\n  background: var(--background-active-enable-qxin);\n}\n#settingLayerMask .sej-engine:hover {\n  background-color: var(--background-active-enable-qxin);\n}\n#settingLayerMask [data-iqxindisabled=\"true\"]:hover,\n[data-xin^=\"-\"]:hover {\n  background-color: var(--background-active-disable-qxin);\n}\n#settingLayerMask label {\n  cursor: pointer;\n}\n#settingLayerMask .sej-engine-icon {\n  vertical-align: middle;\n}\n#btnEle2,\n#btnEle {\n  position: relative;\n  width: 100%;\n  background: var(--background-setting-qxin);\n  border-radius: 8px;\n  flex: 0 0 auto;\n  margin-top: 8px;\n}\n#btnEle2 span,\n#btnEle span {\n  display: inline-block;\n  background: var(--background-btn-qxin);\n  border: 1px solid #3abdc1;\n  margin: 12px auto 10px;\n  color: #3abdc1;\n  padding: 5px 10px;\n  border-radius: 4px;\n  cursor: pointer;\n  outline: none;\n  transition: 0.3s;\n}\n#btnEle label,\n#btnEle2 label {\n  color: #3abdc1;\n}\n#btnEle span:hover label,\n#btnEle2 span:hover label {\n  color: #fff;\n}\n#btnEle a {\n  color: #999;\n  text-decoration: none;\n  font-family: auto;\n}\n#btnEle a:hover {\n  text-decoration: none;\n  color: #ef8957;\n}\n#btnEle2 span.feedback:hover,\n#btnEle span.feedback:hover {\n  border-color: #ef8957;\n}\n#btnEle2 span:not(.feedback):hover,\n#btnEle span:not(.feedback):hover,\n#btnEle2 span:not(.feedback):hover select,\n#btnEle span:not(.feedback):hover select {\n  background: #3acbdd;\n  color: #fff;\n}\n#btnEle2 span:not(.feedback) option,\n#btnEle span:not(.feedback) option {\n  background: var(--background-btn-qxin);\n  color: var(--font-color-qxin);\n}\n#btnEle .feedback {\n  text-decoration: none;\n  border-color: #aaa;\n}\n#btnEle2 > div,\n#btnEle > div {\n  width: 100%;\n  display: flex;\n  flex-wrap: wrap;\n  justify-content: space-around;\n  background: var(--background-btn-qxin);\n  border-radius: 4px;\n  box-sizing: border-box;\n}\n#btnEle2 {\n  display: none;\n  opacity: 0;\n  transform: translate(0, 8px);\n  transition: 0.3s;\n  max-height: 40vh;\n  overflow-y: auto;\n}\n#btnEle2.btnEle2active {\n  display: block;\n  opacity: 1;\n  transform: translate(0, 0);\n}\n#settingLayerMask input[type=\"checkbox\"] {\n  width: 12px;\n  height: 12px;\n  display: inline-block;\n  text-align: center;\n  vertical-align: middle;\n  line-height: 10px !important;\n  margin: 0 5px 5px 5px !important;\n  position: relative;\n}\n#settingLayerMask input[type=\"checkbox\"]:before {\n  content: \"\";\n  position: absolute;\n  top: 0;\n  left: 0;\n  background: #fff;\n  width: 100%;\n  height: 100%;\n  border: 1px solid #d9d9d9;\n}\n#settingLayerMask input[type=\"checkbox\"]:checked:after {\n  content: \"✔\";\n  background-color: #63d4d8;\n  position: absolute;\n  top: 0;\n  left: 0;\n  width: 12px;\n  height: 12px;\n  border: 1px solid #63d4d8;\n  color: #fff;\n  font-size: 10px;\n}\n.drop-over {\n  opacity: 0.6;\n}\n.iqxin-title-edit,\n.iqxin-set-edit,\n.iqxin-set-title-del,\n.iqxin-set-del {\n  visibility: hidden;\n  opacity: 0;\n  position: absolute;\n  background: rgba(207, 249, 255, 0.86);\n  color: red;\n  top: 50%;\n  transform: translate(0, -50%);\n  right: 0;\n  padding: 3px 3px 4.5px 4.5px;\n  border-radius: 4px;\n  cursor: pointer;\n  transition: 0.3s;\n}\n.iqxin-set-title-del.iqxin-set-active {\n  background: #fff;\n  border-radius: 4px 0 0 4px;\n}\nspan.iqxin-additem {\n  display: inline-block;\n  text-align: center;\n  width: 100%;\n  margin: 10px 0;\n  border: 1px dotted red;\n  color: red;\n  cursor: pointer;\n  visibility: hidden;\n  opacity: 0;\n  transition: 0.3s;\n  transform: scale(0);\n}\nspan.iqxin-additem.iqxin-set-active {\n  visibility: visible;\n  opacity: 1;\n  margin: 10px 0;\n  transform: scale(1);\n}\n#settingLayer .sejtitle:hover .iqxin-title-edit,\n#settingLayer .sejcon > span:hover .iqxin-set-edit {\n  visibility: visible;\n  opacity: 0.8;\n}\n#nSearchList.iqxin-set-active,\n.iqxin-set-edit.iqxin-set-active,\n.iqxin-set-title-del.iqxin-set-active,\n.iqxin-set-del.iqxin-set-active {\n  visibility: visible !important;\n  opacity: 1 !important;\n}\n#btnEle span.iqxin-btn-active {\n  color: red;\n  border-color: red;\n}\n#newSearchListBox,\n#newSearchBox {\n  transition: 0.3s;\n  transform: translateY(0%);\n  opacity: 1;\n  position: fixed;\n  z-index: 200000100;\n  top: 50%;\n  left: 50%;\n  padding: 22px;\n  background: rgb(29, 29, 29);\n  border-radius: 4px;\n  color: #e8e8e8;\n  margin: -149px -117px;\n}\n#newSearchListBox input,\n#newSearchBox input {\n  border: none;\n  padding: 4px 0 4px 5px;\n  border-radius: 4px;\n  outline: none;\n}\n#newSearchBox #iqxin-newTarget {\n  border-radius: 4px;\n  border: none;\n  padding: 2px 0 2px 2px;\n}\n.iqxin-help-link {\n  color: #999;\n}\n#newSearchListBox input:focus,\n#newSearchBox input:focus {\n  background: #f1d2d2;\n  transition: 0.5s;\n}\n.addItemBoxBtn {\n  cursor: pointer;\n  background: #fff;\n  border: none;\n  border-radius: 4px;\n  padding: 4px 10px;\n  color: #333;\n  transition: 0.3s;\n}\n#xin-centerDisplay select,\n#xin-newtab select {\n  height: auto;\n  border: none;\n  outline: none;\n  color: #3abdc1;\n  font-size: 1em;\n  font-family: sans-serif;\n  padding: 0px 5px;\n  cursor: pointer;\n  text-decoration: none;\n  background: var(--background-btn-qxin);\n  transition: 0.3s;\n}\n#titleEdit {\n  width: 6em;\n}\n.iqxin-closeBtn,\n.iqxin-enterBtn {\n  box-sizing: border-box;\n}\n.iqxin-closeBtn:hover {\n  background: #ff6565;\n  border-color: #ff6565;\n  color: #fff;\n}\n.iqxin-enterBtn:hover {\n  background: #84bb84;\n  border-color: #84bb84;\n  color: #fff;\n}\n#iqxin-editCodeBox button {\n  cursor: pointer;\n}\n#iqxin-editCodeBox textarea {\n  overflow: auto;\n  border-radius: 4px;\n}\n.iqxin-warning {\n  color: red;\n  font-size: 1.2em;\n}\ninput#setBtnOpacityRange[type=\"range\"] {\n  outline: none;\n  appearance: none;\n  background: -webkit-linear-gradient(left, #3abdc1, #83e7ea) no-repeat, #fff;\n  border-radius: 10px; /*这个属性设置使填充进度条时的图形为圆角*/\n}\n.iqxin-setBtnOpacityRangeValue {\n  display: inline-block;\n  width: 3em;\n  text-align: center;\n}\ninput#setBtnOpacityRange[type=\"range\"]::-webkit-slider-thumb {\n  appearance: none;\n}\ninput#setBtnOpacityRange[type=\"range\"]::-webkit-slider-runnable-track {\n  height: 10px;\n  border-radius: 10px; /*将轨道设为圆角的*/\n  box-shadow: 0 1px 1px #def3f8, inset 0 0.125em 0.125em #0d1112; /*轨道内置阴影效果*/\n}\ninput#setBtnOpacityRange[type=\"range\"]::-webkit-slider-thumb {\n  appearance: none;\n  height: 18px;\n  width: 18px;\n  margin-top: -5px; /*使滑块超出轨道部分的偏移量相等*/\n  background: #fff;\n  border-radius: 50%; /*外观设置为圆形*/\n  border: solid 0.125em rgba(205, 224, 230, 0.5); /*设置边框*/\n  box-shadow: 0 0.125em 0.125em #3b4547; /*添加底部阴影*/\n}\n#importingBox {\n  position: fixed;\n  width: 350px;\n  top: 50%;\n  left: 50%;\n  transform: translate(-50%, -50%);\n  padding: 15px 30px;\n  border-radius: 4px;\n  background: #1d1d1d;\n  color: #fff;\n}\n#importingBox li {\n  margin: 5px;\n  border-bottom: 1px solid #3acbdd;\n}\n#importingBox li p {\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  margin-top: 0;\n  margin-bottom: 0;\n}\n.xin-importing-item {\n  cursor: pointer;\n}\n#setBtn {\n  transition: 0.5s;\n  padding: 0 1em;\n  height: 2.6em;\n  align-items: center;\n  cursor: pointer;\n  display: flex;\n}\nspan#setBtn:hover {\n  opacity: 1;\n  background-color: var(--background-hover-color-qxin);\n}\n#sej-container {\n  display: flex;\n  align-items: center;\n  position: relative;\n  z-index: 2;\n  padding: 0;\n  font-size: 13px;\n  font-family: sans-serif;\n  transform-origin: top center;\n  animation: sejopen 0.3s;\n  color: var(--font-color-qxin);\n  background: var(--background-color-qxin);\n  backdrop-filter: blur(40px);\n  width: max-content !important;\n  max-width: 100%;\n  box-sizing: border-box;\n  border-radius: 8px;\n  border-width: thin;\n  border-style: solid;\n  border-color: var(--border-color-sej);\n  overflow: auto;\n  box-shadow: 0 0 0.6em var(--box-shadow-color-sej);\n  height: fit-content;\n  flex-wrap: wrap;\n  justify-content: center;\n  user-select: none;\n}\n/* 给用户的提示 */\n#iqixn-global-tip {\n  box-sizing: content-box !important;\n  opacity: 0;\n  height: 25px;\n  line-height: 25px;\n  letter-spacing: 1px;\n  font-size: 14px;\n  color: #fff;\n  padding: 5px 20px;\n  border-radius: 8px;\n  background-color: #666;\n  position: fixed;\n  z-index: 200000001;\n  left: 50%;\n  bottom: 5%;\n  transform: translate(-50%);\n  transition: 0.4s;\n}\n/* 夜间模式 - 默认主题变量 */\n:root,\n:host,\nbody {\n  --font-color-qxin: #333;\n  --background-color-qxin: #fffffff0;\n  --background-avtive-color-qxin: #ccc;\n  --background-active-enable-qxin: #cff9ff;\n  --background-active-disable-qxin: #ffa2a2;\n  --background-hover-color-qxin: #eaeaea;\n  --trigger-shown-qxin: #deedff !important;\n  --background-btn-qxin: #eff4f8;\n  --background-setting-qxin: #fff;\n  --box-shadow-color-sej: hsla(0, 0%, 0%, 7%);\n  --border-color-sej: #e1e6ea;\n}\n/* 暗黑模式变量 - 当主文档是暗黑模式时 */\n:root[qxintheme=\"dark\"],\n:host[qxintheme=\"dark\"],\nbody[qxintheme=\"dark\"] {\n  --font-color-qxin: #bdc1bc;\n  --background-color-qxin: #202124f0;\n  --background-avtive-color-qxin: #424242;\n  --background-active-enable-qxin: #274144;\n  --background-active-disable-qxin: #583535;\n  --background-hover-color-qxin: #424242;\n  --trigger-shown-qxin: #424242 !important;\n  --background-btn-qxin: #292f36;\n  --background-setting-qxin: #202124;\n  --box-shadow-color-sej: hsla(0, 0%, 70%, 10%);\n  --border-color-sej: #3b4547;\n}\n/* 滑词搜索样式 */\n#sej-container.selectSearch {\n  position: fixed;\n  top: 2px;\n  left: 0;\n  right: 0;\n  z-index: 99999999;\n  margin: 0 auto;\n  transform: translateY(calc(-100% - 10px));\n  visibility: hidden;\n  pointer-events: none;\n  transition: transform 0.3s, visibility 0s linear 0.3s;\n}\n#sej-container.selectSearch.sej-select-visible {\n  transform: none;\n  visibility: visible;\n  pointer-events: auto;\n  transition: transform 0.3s, visibility 0s linear 0s;\n}\n#sej-expanded-category {\n  font-weight: bold;\n}\n.sej-category-title {\n  font-weight: 600;\n  padding: 0 8px;\n  opacity: 0.8;\n}\n.sej-engine {\n  padding: 0 13px;\n  transition: background-color 0.2s ease-out;\n  font-size: 13px;\n  font-family: sans-serif;\n  display: inline-flex;\n  gap: 8px;\n  align-items: center;\n  height: 2.6em;\n  text-decoration: none !important;\n  color: var(--font-color-qxin) !important;\n  cursor: pointer;\n}\n.sej-drop-list a:visited,\n.sej-drop-list a:hover,\n.sej-engine a:visited,\n.sej-engine a:hover,\n#sej-container a:link,\n#sej-container a:visited,\n#sej-container a:hover {\n  color: var(--font-color-qxin);\n}\n.sej-engine:hover {\n  background-color: var(--background-hover-color-qxin);\n}\n.sej-drop-list > .sej-engine {\n  display: flex;\n  justify-content: flex-start;\n}\n\n.sej-engine-icon {\n  width: 16px;\n  height: 16px;\n  object-fit: cover;\n  display: inline-block;\n  margin: 0;\n}\n.sej-engine-icon:not([src]) {\n  display: none;\n}\n\n.sej-drop-list {\n  /* 使用 fixed 定位确保在 Shadow DOM 中位置正确 */\n  position: fixed;\n  display: none;\n  opacity: 0.2;\n  top: -10000px;\n  left: 0;\n  min-width: 90px;\n  text-align: left;\n  font-size: 13px;\n  box-shadow: 0em 0.6em 0.6em var(--box-shadow-color-sej);\n  background-color: var(--background-color-qxin);\n  backdrop-filter: blur(40px);\n  transition: opacity 0.2s ease-out, top 0.2s ease-out;\n  overflow: hidden;\n  border-radius: 8px;\n  border-width: thin;\n  border-style: solid;\n  border-color: var(--border-color-sej);\n  user-select: none;\n}\n@keyframes sej-setting-mask-in {\n  from {\n    opacity: 0;\n  }\n}\n@keyframes sejopen {\n  0% {\n    transform: scale(1, 0.1);\n    opacity: 0;\n  }\n  100% {\n    transform: scale(1, 1);\n    opacity: 1;\n  }\n}\n@keyframes iqxinsejopen {\n  0% {\n    transform: scale(0.01, 0.01);\n    opacity: 0;\n  }\n  100% {\n    transform: scale(1, 1);\n    opacity: 1;\n  }\n}\n\n/* ---------- Vue 重构版设置面板布局优化 ---------- */\n#settingLayerMask {\n  padding: 20px;\n  box-sizing: border-box;\n}\n\n#sej-settings-body {\n  display: flex;\n  flex: 1 1 auto;\n  flex-wrap: wrap;\n  align-content: flex-start;\n  min-height: 0;\n  overflow-y: auto;\n  overflow-x: hidden;\n  /* 让滚动条贴住面板内边缘，而不是停在内容区的内边距处 */\n  margin-top: calc(var(--sej-panel-pad-top) * -1);\n  margin-right: calc(var(--sej-panel-pad-x) * -1);\n  padding-top: var(--sej-panel-pad-top);\n  padding-right: var(--sej-panel-pad-x);\n  padding-bottom: 12px;\n}\n#sej-settings-body::-webkit-scrollbar {\n  width: 8px;\n}\n#sej-settings-body::-webkit-scrollbar-thumb {\n  background: var(--background-avtive-color-qxin);\n  border-radius: 4px;\n}\n#settingLayer #btnEle,\n#settingLayer #btnEle2 {\n  flex: 0 0 auto;\n}\n\n@media (max-width: 780px) {\n  #btnEle span,\n  #btnEle2 span {\n    font-size: 12px;\n    padding: 3px 6px;\n    margin: 6px auto;\n  }\n  #settingLayer {\n    --sej-panel-pad-x: 12px;\n  }\n}\n";
 	var DARK_MODE_STYLE = `
   :root,
   :host {
@@ -16319,9 +16349,10 @@
 `;
 	var SETTINGS_NON_TRANSITION_STYLE = `
   #settingLayer, #btnEle span, #btnEle2, .iqxin-set-del,
-  span.iqxin-additem, #newSearchBox, .addItemBoxBtn, #xin-close, #settingLayerMask {
+  span.iqxin-additem, #newSearchBox, .addItemBoxBtn, #settingLayerMask {
     transition: none;
   }
+  #settingLayerMask { animation: none; }
   #settingLayerMask { backdrop-filter: none; }
 `;
 	var DELAY_LIST = [
@@ -16372,7 +16403,11 @@
 		app = createApp(_sfc_main);
 		app.mount(getRoot());
 		if (!menuRegistered) {
-			_GM_registerMenuCommand("设置菜单", openSettingPanel);
+			try {
+				_GM_registerMenuCommand("设置菜单", openSettingPanel);
+			} catch (e) {
+				console.warn("[SEJ] 注册菜单命令失败", e);
+			}
 			menuRegistered = true;
 		}
 	}
@@ -16383,6 +16418,17 @@
 			if (!isRunning()) boot();
 		}, 1e3);
 		else boot();
+	}
+	function restart() {
+		closeSettingPanel();
+		if (app) {
+			try {
+				app.unmount();
+			} catch (e) {}
+			app = null;
+		}
+		reset();
+		boot();
 	}
 	function normalizeURL(urlString) {
 		try {
@@ -16410,6 +16456,7 @@
 			startScript();
 		});
 	}
+	onRestartRequest(restart);
 	startScript();
 	listenUrlChange();
 })();
