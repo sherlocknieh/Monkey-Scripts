@@ -13,7 +13,6 @@ export const SCRIPT_MESSAGE =
   '(modifySearchItems: 允许更新时,修改你的搜索列表中的项目)...' +
   '(newtab: 新标签页打开。0为默认设置,1为新标签页打开)...' +
   '(foldlist: 折叠当前搜索分类列表。true为折叠,false为展开。)...' +
-  '(setBtnOpacity: 设置按钮的透明度,值为0-1之间的数,0为透明,1为完全显示,中间值半透明。注：-1为直接关闭按钮,关闭之前请确定自己知道如何再次打开它)...' +
   '(debug: debug模式,开启后,控制台会输出一些信息,“关闭并保存”按钮将不会在刷新页面)...' +
   '(fixedTop: 将搜索栏固定到顶端。 true开启,false关闭)...' +
   '(fixedTopUpward: 固定顶端后，搜索栏下拉不会出现，只有上拉时才出现。 true开启,false关闭)...' +
@@ -38,7 +37,6 @@ function createDefaultSettings() {
     modifySearchItems: true,
     newtab: 0,
     foldlist: true,
-    setBtnOpacity: 0.7,
     debug: false,
     fixedTop: true,
     fixedTopUpward: false,
@@ -126,13 +124,6 @@ export class Settings {
 
     this.settingData.version = this.scriptSettingData.version;
     this.settingData.message = this.scriptSettingData.message;
-
-    if (
-      this.settingData.setBtnOpacity === '0.2' &&
-      isVersionOutdated(this.storedSettingData.version, '5.29.9')
-    ) {
-      this.settingData.setBtnOpacity = '0.7';
-    }
 
     if (isVersionOutdated(this.storedSettingData.version, '5.30.2')) {
       this.deleteOutdatedSearchItems(['https://so.letv.com/s?wd=%s']);

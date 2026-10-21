@@ -11,7 +11,7 @@ export default defineConfig({
       userscript: {
         name: 'SearchEngineJump++',
         namespace:'npm/vite-plugin-monkey',
-        version: '2026.10.22.01',
+        version: '2026.10.22.02',
         description:
           'Fork 版本搜索引擎跳转脚本，Vue 重构版。在搜索页插入跳转小横条，支持划词搜索、分类下拉、设置菜单等。',
         author: 'NLF & 锐经 & iqxin & MUTED64',

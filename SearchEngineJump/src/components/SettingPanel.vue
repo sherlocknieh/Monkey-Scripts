@@ -27,7 +27,6 @@ const OPTION_KEYS = [
     'modifySearchItems',
     'newtab',
     'foldlist',
-    'setBtnOpacity',
     'debug',
     'fixedTop',
     'fixedTopUpward',
@@ -48,7 +47,6 @@ function makeDraft() {
     const raw = JSON.parse(JSON.stringify(source));
     const d = {};
     for (const key of OPTION_KEYS) d[key] = raw[key];
-    d.setBtnOpacity = Number(raw.setBtnOpacity);
     d.categories = raw.engineDetails.map(([name, key, enabled]) => ({
         _id: nextId(),
         name,
@@ -78,25 +76,11 @@ const online = ref(false);
 const editIcon = EDIT;
 const delIcon = DEL;
 
-const opacityValue = computed(() => Math.abs(Number(draft.setBtnOpacity)));
-const opacityLabel = computed(() => {
-    if (Number(draft.setBtnOpacity) < 0) return '禁用';
-    return opacityValue.value.toFixed(2);
-});
 const configText = computed(() => {
     const clean = JSON.parse(JSON.stringify(source));
     if (clean.engineList) delete clean.engineList.engineCategories;
     return JSON.stringify(clean, null, 4);
 });
-
-function onOpacityInput(e) {
-    const value = Number(e.target.value);
-    draft.setBtnOpacity = Number(draft.setBtnOpacity) < 0 ? -value : value;
-}
-
-function toggleBtnDisabled() {
-    draft.setBtnOpacity = -Number(draft.setBtnOpacity);
-}
 
 function buildResult() {
     const result = {};
@@ -468,14 +452,6 @@ onBeforeUnmount(() => {
                     </span>
                     <span id="xin-HideTheSameLink" title="隐藏同站链接">
                         <label>隐藏同站链接<input type="checkbox" v-model="draft.HideTheSameLink" /></label>
-                    </span>
-                    <span id="xin-setBtnOpacity" title="设置按钮透明度">
-                        设置按钮透明度
-                        <input id="setBtnOpacityRange" type="range" step="0.05" min="0" max="1" :value="opacityValue"
-                            @input="onOpacityInput" />
-                        <i class="iqxin-setBtnOpacityRangeValue" @click="toggleBtnDisabled">
-                            {{ opacityLabel }}
-                        </i>
                     </span>
                 </div>
             </div>
