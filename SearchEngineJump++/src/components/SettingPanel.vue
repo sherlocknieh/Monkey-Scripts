@@ -21,7 +21,6 @@ const source = settings.settingData;
 
 const OPTION_KEYS = [
     'status',
-    'message',
     'version',
     'addSearchItems',
     'modifySearchItems',

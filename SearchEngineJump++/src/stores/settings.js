@@ -6,32 +6,10 @@ import { XIAOHONGSHU, X_ICON, TIEBA } from '../data/favicons.js';
 
 export const STORAGE_KEY = 'searchEngineJumpData';
 export const SCRIPT_VERSION = '5.32.7';
-export const SCRIPT_MESSAGE =
-  '$相关说明$(status: 这个在将来或许很重要)...' +
-  '(version: 若有新功能加入,靠这个版本号识别)...' +
-  '(addSearchItems: 允许更新时,添加新的搜索网站到你的搜索列表)...' +
-  '(modifySearchItems: 允许更新时,修改你的搜索列表中的项目)...' +
-  '(newtab: 新标签页打开。0为默认设置,1为新标签页打开)...' +
-  '(foldlist: 折叠当前搜索分类列表。true为折叠,false为展开。)...' +
-  '(debug: debug模式,开启后,控制台会输出一些信息,“关闭并保存”按钮将不会在刷新页面)...' +
-  '(fixedTop: 将搜索栏固定到顶端。 true开启,false关闭)...' +
-  '(fixedTopUpward: 固定顶端后，搜索栏下拉不会出现，只有上拉时才出现。 true开启,false关闭)...' +
-  '(baiduOffset: 在百度页面鼠标划过的菜单会出现位移,若有使用其他的style样式,可以修改这个来修复二级菜单的偏移)...' +
-  '(getIcon: 自己添加搜索后获取图标的方式。0为自动，能连接谷歌的情况下用谷歌获取，无法连接的情况下，域名加favicon.ico获取；1为域名加favicon获取，2为使用谷歌获取，3为使用dnspot的服务获取(不建议使用)。或者添加网址，关键字使用%s代替，未测试。保存设置时会把远程图标内嵌为 data URL 存入 faviconData，并保留原始链接 favicon，以兼容 Wikipedia 等严格 CSP 页面)...' +
-  '(allOpen:一键搜索，点击相关分类后，打开该分类下的所有搜索)...' +
-  '(HideTheSameLink:隐藏同站链接。默认开启,百度页面会隐藏百度搜索。如果想在同一个搜索网站,但是想通过不同语言来搜索, 可以选择false来实现)...' +
-  '(center:是否居中显示，主要是为了兼容脚本 ac 百度  ： 0 不居中，强制在左。 1, 强制居中 。 2,自动判断)...' +
-  '(icon: 图标的显示方式, 0 关闭文字, 只保留图标, 1 显示网站图标,2 显示抽象图标。当脚本中不存在抽象图标时,显示网站图标)...' +
-  '(transtion: 是否有动画效果, true为开启所有动画效果,false关闭所有动画(包括模糊效果)。)' +
-  '(selectSearch: 划词搜索功能, true为开启划词搜索,false关闭)' +
-  '(engineDetails: 第一个值为分类列表标题名称,第二个值与enginelist相关联,必须匹配,第三个值true为显示列表,false为禁用列表。排列顺序与跳转栏上的显示顺序相同，可以用它将分类列表按自己喜欢排序)...' +
-  '(engineList: 各个搜索的相关信息)' +
-  '(rules: 已弃用--将搜索样式插入到目标网页,同脚本中的rules设置相同,优先级高于脚本中自带的规则。自带了360搜索,可仿写)...';
 
 function createDefaultSettings() {
   return {
     status: 1,
-    message: SCRIPT_MESSAGE,
     version: SCRIPT_VERSION,
     addSearchItems: true,
     modifySearchItems: true,
@@ -110,6 +88,11 @@ export class Settings {
         setValue(STORAGE_KEY, this.settingData);
       }
     }
+    // 旧版本遗留的说明字段
+    if (Object.prototype.hasOwnProperty.call(this.settingData, 'message')) {
+      delete this.settingData.message;
+      setValue(STORAGE_KEY, this.settingData);
+    }
   }
 
   checkUpdate() {
@@ -123,7 +106,6 @@ export class Settings {
     }
 
     this.settingData.version = this.scriptSettingData.version;
-    this.settingData.message = this.scriptSettingData.message;
 
     if (isVersionOutdated(this.storedSettingData.version, '5.30.2')) {
       this.deleteOutdatedSearchItems(['https://so.letv.com/s?wd=%s']);
