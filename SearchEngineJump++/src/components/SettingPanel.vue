@@ -26,7 +26,6 @@ const OPTION_KEYS = [
     'addSearchItems',
     'modifySearchItems',
     'newtab',
-    'foldlist',
     'debug',
     'fixedTop',
     'fixedTopUpward',
@@ -638,15 +637,6 @@ onBeforeUnmount(() => {
             <!-- 底部设置按钮 -->
             <div id="btnEle">
                 <div class="btnEleLayer">
-                    <div class="sej-footer-links">
-                        <span class="feedback" title="在 GreasyFork 进行反馈">
-                            <a target="_blank" href="https://greasyfork.org/en/scripts/454280-searchenginejumpplus">Greasy
-                                Fork</a>
-                        </span>
-                        <span class="feedback" title="在 Github 进行反馈">
-                            <a target="_blank" href="https://github.com/MUTED64/SearchEngineJumpPlus">GitHub</a>
-                        </span>
-                    </div>
                     <div class="sej-footer-options">
                         <span id="xin-modification" title="配置文件" @click="openConfig">
                             配置文件
@@ -657,9 +647,6 @@ onBeforeUnmount(() => {
                         <span id="xin-transtion" title="动画">
                             <label>动画<input type="checkbox" v-model="draft.transtion" /></label>
                         </span>
-                        <span id="xin-foldlists" title="折叠当前搜索分类">
-                            <label>折叠当前搜索分类<input type="checkbox" v-model="draft.foldlist" /></label>
-                        </span>
                         <span id="iqxin-fixedTopS" title="固定到顶端">
                             <label>固定到顶端<input type="checkbox" v-model="draft.fixedTop" /></label>
                         </span>
@@ -669,30 +656,43 @@ onBeforeUnmount(() => {
                         <span id="xin-HideTheSameLink" title="隐藏同站链接">
                             <label>隐藏同站链接<input type="checkbox" v-model="draft.HideTheSameLink" /></label>
                         </span>
-                        <span id="xin-centerDisplay" title="居中显示">
-                            居中：
-                            <select v-model.number="draft.center">
-                                <option :value="0">默认</option>
-                                <option :value="1">强制</option>
-                                <option :value="2">自动</option>
-                            </select>
-                        </span>
-                        <span id="xin-newtab" title="是否采用新标签页打开">
-                            打开方式：
-                            <select v-model.number="draft.newtab">
-                                <option :value="0">默认页面</option>
-                                <option :value="1">新标签页</option>
-                            </select>
-                        </span>
-                        <span id="xin-loadIcons" title="把所有远程图标内嵌为 data 链接"
-                            :class="{ 'sej-loading': loadingIcons }" @click="loadAllIcons">
-                            {{ loadingIcons ? '加载中…' : '加载所有图标缓存' }}
-                        </span>
                     </div>
-                    <div class="sej-footer-actions">
-                        <span id="xin-save" title="save & close" :class="{ 'sej-saving': saving }" @click="save">
-                            {{ saving ? '保存中…' : '保存并关闭' }}
-                        </span>
+                    <div class="sej-footer-bar">
+                        <div class="sej-footer-selects">
+                            <span id="xin-centerDisplay" title="居中显示">
+                                居中：
+                                <select v-model.number="draft.center">
+                                    <option :value="0">默认</option>
+                                    <option :value="1">强制</option>
+                                    <option :value="2">自动</option>
+                                </select>
+                            </span>
+                            <span id="xin-newtab" title="是否采用新标签页打开">
+                                打开方式：
+                                <select v-model.number="draft.newtab">
+                                    <option :value="0">默认页面</option>
+                                    <option :value="1">新标签页</option>
+                                </select>
+                            </span>
+                            <span id="xin-loadIcons" title="把所有远程图标内嵌为 data 链接"
+                                :class="{ 'sej-loading': loadingIcons }" @click="loadAllIcons">
+                                {{ loadingIcons ? '加载中…' : '加载所有图标缓存' }}
+                            </span>
+                        </div>
+                        <div class="sej-footer-links">
+                            <span class="feedback" title="在 GreasyFork 进行反馈">
+                                <a target="_blank" href="https://greasyfork.org/zh-CN/users/1238054">Greasy
+                                    Fork</a>
+                            </span>
+                            <span class="feedback" title="在 Github 进行反馈">
+                                <a target="_blank" href="https://github.com/sherlocknieh/Monkey-Scripts">GitHub</a>
+                            </span>
+                        </div>
+                        <div class="sej-footer-actions">
+                            <span id="xin-save" title="save & close" :class="{ 'sej-saving': saving }" @click="save">
+                                {{ saving ? '保存中…' : '保存并关闭' }}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>

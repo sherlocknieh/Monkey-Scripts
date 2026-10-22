@@ -55,14 +55,6 @@ const categories = computed(() =>
     .filter((category) => category.engines.length),
 );
 
-function isFlatCategory(category) {
-  return (
-    !data.foldlist &&
-    category.key === matchedRule?.engineList &&
-    Array.isArray(category.engines)
-  );
-}
-
 function getCurrentKeyword() {
   if (isSelectSearch.value) return selectionText.value;
   return extractKeyword(inputTarget);
@@ -345,7 +337,7 @@ onBeforeUnmount(() => {
     :aria-hidden="isSelectSearch && !barVisible ? 'true' : undefined"
   >
     <template v-for="category in categories" :key="category.key">
-      <template v-if="isFlatCategory(category) || inlineStyleBlocked">
+      <template v-if="inlineStyleBlocked">
         <span v-if="inlineStyleBlocked" class="sej-category-title">
           {{ category.name }}
         </span>

@@ -14,7 +14,6 @@ function createDefaultSettings() {
     addSearchItems: true,
     modifySearchItems: true,
     newtab: 0,
-    foldlist: true,
     debug: false,
     fixedTop: true,
     fixedTopUpward: false,

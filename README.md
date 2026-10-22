@@ -13,6 +13,9 @@
 
 ## 开发指南
 
+项目使用 [vite-plugin-monkey](https://github.com/lisonge/vite-plugin-monkey) 构建
+
+
 - **创建项目**
     ```bash
     npm create monkey
