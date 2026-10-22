@@ -12,8 +12,9 @@ import { useSettings, STORAGE_KEY } from '../stores/settings.js';
 import { requestRestart } from '../core/appControl.js';
 import { embedFavicon, getFaviconSrc } from '../core/favicon.js';
 import { closeSettingPanel, showToast } from '../stores/ui.js';
-import { EDIT, DEL, EYE, EYE_OFF } from '../data/icons.js';
+import { EDIT, EYE, EYE_OFF } from '../data/icons.js';
 import EngineEditDialog from './EngineEditDialog.vue';
+import CategoryEditDialog from './CategoryEditDialog.vue';
 import ConfigEditor from './ConfigEditor.vue';
 
 const settings = useSettings();
@@ -64,7 +65,7 @@ const layerEl = ref(null);
 const maskEl = ref(null);
 const maskVisible = ref(false);
 const layerStyle = ref({});
-const editingCategory = ref(-1);
+const categoryDialog = ref(null);
 const engineDialog = ref(null);
 const engineSaving = ref(false);
 const saving = ref(false);
@@ -76,7 +77,6 @@ const UNDO_DURATION = 5000;
 const undoStack = [];
 
 const editIcon = EDIT;
-const delIcon = DEL;
 
 const configText = computed(() => {
     const clean = JSON.parse(JSON.stringify(source));
@@ -242,7 +242,7 @@ function pushUndo(entry) {
 }
 
 function undoDelete() {
-    if (engineDialog.value || configOpen.value) {
+    if (engineDialog.value || categoryDialog.value || configOpen.value) {
         showToast('请先关闭当前对话框');
         return;
     }
@@ -265,7 +265,7 @@ function undoDelete() {
         category.engines.splice(index, 0, entry.item);
     }
 
-    editingCategory.value = -1;
+    categoryDialog.value = null;
     showToast(`已撤销删除${entry.label}`);
 }
 
@@ -326,19 +326,27 @@ function onKeydown(e) {
     undoDelete();
 }
 
-function startRenameCategory(index) {
-    editingCategory.value = index;
+function openCategoryDialog(index) {
+    categoryDialog.value = { index };
 }
 
-function finishRenameCategory(index, e) {
-    if (editingCategory.value !== index) return;
-    const value = e.target.value.trim();
-    draft.categories[index].name = value || '空';
-    editingCategory.value = -1;
+function submitCategory(name) {
+    const ctx = categoryDialog.value;
+    if (!ctx) return;
+    const category = draft.categories[ctx.index];
+    if (category) category.name = name || '空';
+    categoryDialog.value = null;
 }
 
-function cancelRenameCategory() {
-    editingCategory.value = -1;
+function cancelCategoryDialog() {
+    categoryDialog.value = null;
+}
+
+function deleteCategoryFromDialog() {
+    const ctx = categoryDialog.value;
+    if (!ctx) return;
+    categoryDialog.value = null;
+    deleteCategory(ctx.index);
 }
 
 const dragCtx = ref(null);
@@ -393,6 +401,13 @@ function editEngine(ci, ei) {
 
 function cancelEngineDialog() {
     if (!engineSaving.value) engineDialog.value = null;
+}
+
+function deleteEngineFromDialog() {
+    const ctx = engineDialog.value;
+    if (!ctx || ctx.mode !== 'edit') return;
+    engineDialog.value = null;
+    deleteEngine(ctx.ci, ctx.ei);
 }
 
 async function submitEngine(engine) {
@@ -576,24 +591,17 @@ onBeforeUnmount(() => {
             <div id="sej-settings-body">
                 <!-- 分类列表 -->
                 <div v-for="(category, ci) in draft.categories" :id="category.key" :key="category._id"
-                    class="iqxin-items">
+                    class="iqxin-items" :class="{ 'sej-category-hidden': !category.enabled }">
                     <!-- 类别标题 -->
                     <div class="sejtitle drag" draggable="true" :data-xin="category.enabled ? 1 : -1"
                         :data-iqxintitle="category.key" @dragstart="onDragStart($event, 'category', ci)"
-                        @dragover.prevent @drop="onDrop($event, 'category', ci)">
-                        <input v-if="editingCategory === ci" id="titleEdit" type="text" :value="category.name"
-                            @click.stop @keydown.enter="finishRenameCategory(ci, $event)"
-                            @keydown.esc="cancelRenameCategory" @blur="finishRenameCategory(ci, $event)" />
-                        <span v-else class="iqxin-pointer-events">{{ category.name }}</span>
+                        @dragover.prevent @drop="onDrop($event, 'category', ci)" @click.stop="toggleCategory(ci)">
+                        <span class="iqxin-pointer-events">{{ category.name }}</span>
                         <span class="iqxin-set-toggle" :class="{ 'iqxin-set-hidden': !category.enabled }"
                             :title="category.enabled ? '隐藏' : '显示'" @click.stop="toggleCategory(ci)"
                             v-html="category.enabled ? EYE : EYE_OFF"></span>
-                        <span class="iqxin-title-edit" title="编辑 Edit" @click.stop="startRenameCategory(ci)">
+                        <span class="iqxin-title-edit" title="设置 Settings" @click.stop="openCategoryDialog(ci)">
                             <img class="sej-engine-icon" :src="editIcon" alt="" />
-                        </span>
-                        <span class="iqxin-set-title-del" title="删除 Delete"
-                            @click.stop="deleteCategory(ci)">
-                            <img class="sej-engine-icon" :src="delIcon" alt="" />
                         </span>
                     </div>
 
@@ -602,7 +610,7 @@ onBeforeUnmount(() => {
                         <!-- 每个搜索引擎 -->
                         <span v-for="(engine, ei) in category.engines" :key="engine._id" class="drag" draggable="true"
                             @dragstart="onDragStart($event, 'engine', ci, ei)" @dragover.prevent
-                            @drop="onDrop($event, 'engine', ci, ei)">
+                            @drop="onDrop($event, 'engine', ci, ei)" @click.stop="toggleEngine(ci, ei)">
                             <span class="sej-engine" :data-iqxintitle="engine.name" :data-iqxinimg="engine.favicon"
                                 :data-iqxinlink="engine.url" :data-iqxintarget="engine.blank ? '_blank' : null"
                                 :data-iqxindisabled="engine.disable ? 'true' : null"
@@ -613,12 +621,8 @@ onBeforeUnmount(() => {
                             <span class="iqxin-set-toggle" :class="{ 'iqxin-set-hidden': engine.disable }"
                                 :title="engine.disable ? '显示' : '隐藏'" @click.stop="toggleEngine(ci, ei)"
                                 v-html="engine.disable ? EYE_OFF : EYE"></span>
-                            <span class="iqxin-set-edit" title="编辑 Edit" @click.stop="editEngine(ci, ei)">
+                            <span class="iqxin-set-edit" title="设置 Settings" @click.stop="editEngine(ci, ei)">
                                 <img class="sej-engine-icon" :src="editIcon" alt="" />
-                            </span>
-                            <span class="iqxin-set-del" title="删除 Delete"
-                                @click.stop="deleteEngine(ci, ei)">
-                                <img class="sej-engine-icon" :src="delIcon" alt="" />
                             </span>
                         </span>
                         <!-- 添加搜索引擎按钮(默认隐藏) -->
@@ -699,7 +703,11 @@ onBeforeUnmount(() => {
 
             <EngineEditDialog v-if="engineDialog" :mode="engineDialog.mode" :initial="engineDialog.initial"
                 :busy="engineSaving" :resolve-icon="getICON" @submit="submitEngine"
-                @cancel="cancelEngineDialog" />
+                @delete="deleteEngineFromDialog" @cancel="cancelEngineDialog" />
+
+            <CategoryEditDialog v-if="categoryDialog"
+                :name="draft.categories[categoryDialog.index]?.name || ''" @submit="submitCategory"
+                @delete="deleteCategoryFromDialog" @cancel="cancelCategoryDialog" />
 
             <ConfigEditor v-if="configOpen" :initial-text="configText" @save="saveConfig" @reset="reset"
                 @close="configOpen = false" @copy="showToast('复制成功')" @notify="showToast" />

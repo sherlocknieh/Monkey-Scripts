@@ -148,13 +148,13 @@
   position: relative;
 }
 #settingLayer .sej-engine {
-  padding: 0 82px 0 8px;
+  padding: 0 56px 0 8px;
   width: 100%;
   height: 30px;
   box-sizing: border-box;
   border-radius: 8px;
   font-size: 13px;
-  cursor: default;
+  cursor: pointer;
 }
 #settingLayer .sej-engine > span {
   flex: 0 1 auto;
@@ -170,12 +170,12 @@
 }
 .sejtitle {
   text-align: left;
-  padding: 5px 82px 5px 8px;
+  padding: 5px 56px 5px 8px;
   margin-bottom: 2px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  cursor: default;
+  cursor: pointer;
   position: relative;
   font-size: 13px;
   font-weight: 600;
@@ -188,9 +188,7 @@
   border-radius: 8px;
 }
 #settingLayerMask .iqxin-set-edit,
-#settingLayerMask .iqxin-set-del,
-#settingLayerMask .iqxin-title-edit,
-#settingLayerMask .iqxin-set-title-del {
+#settingLayerMask .iqxin-title-edit {
   border-radius: 6px;
   line-height: 1em;
   margin-right: 2px;
@@ -198,12 +196,25 @@
 .sejcon [data-xin] {
   cursor: pointer;
 }
+/* 隐藏的条目：灰暗弱化，不抢眼，也不使用删除线 */
 #settingLayerMask [data-iqxindisabled="true"],
 [data-xin^="-"] {
-  background-color: var(--sej-danger-weak);
-  text-decoration: line-through !important;
-  text-decoration-color: var(--sej-danger) !important;
+  background-color: transparent;
+  color: var(--font-color-qxin);
   transition: background-color 0.12s ease-out;
+}
+#settingLayerMask [data-iqxindisabled="true"] > span,
+#settingLayerMask [data-iqxindisabled="true"] .sej-engine-icon,
+[data-xin^="-"] > .iqxin-pointer-events {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+/* 隐藏的分类：分类标题下的所有引擎一并灰暗，操作按钮保持可辨识 */
+.sej-category-hidden .sej-engine > span,
+.sej-category-hidden .sej-engine .sej-engine-icon,
+.sej-category-hidden .iqxin-additem {
+  opacity: 0.4;
+  filter: grayscale(1);
 }
 .sejtitle:not([data-xin^="-"]):hover {
   background: var(--sej-surface-hover);
@@ -213,7 +224,10 @@
 }
 #settingLayerMask [data-iqxindisabled="true"]:hover,
 [data-xin^="-"]:hover {
-  background-color: var(--sej-danger-weak);
+  background-color: transparent;
+}
+.sej-category-hidden .sej-engine:hover {
+  background-color: transparent;
 }
 #settingLayerMask label {
   cursor: pointer;
@@ -382,8 +396,6 @@
 }
 .iqxin-title-edit,
 .iqxin-set-edit,
-.iqxin-set-title-del,
-.iqxin-set-del,
 .iqxin-set-toggle {
   visibility: visible;
   opacity: 0.6;
@@ -399,14 +411,10 @@
 }
 .iqxin-title-edit,
 .iqxin-set-edit {
-  right: 30px;
-}
-.iqxin-set-title-del,
-.iqxin-set-del {
   right: 2px;
 }
 .iqxin-set-toggle {
-  right: 58px;
+  right: 30px;
   display: inline-flex;
   align-items: center;
   color: var(--font-color-qxin);
@@ -419,8 +427,6 @@
 }
 .iqxin-title-edit:hover,
 .iqxin-set-edit:hover,
-.iqxin-set-title-del:hover,
-.iqxin-set-del:hover,
 .iqxin-set-toggle:hover {
   opacity: 1;
   background: var(--sej-surface-hover);
@@ -447,7 +453,8 @@ span.iqxin-additem:hover {
   color: var(--sej-accent);
 }
 #newSearchListBox,
-#newSearchBox {
+#newSearchBox,
+.sej-dialog-box {
   position: fixed;
   z-index: 200000100;
   top: 50%;
@@ -548,7 +555,8 @@ span.iqxin-additem:hover {
   margin-top: 16px;
 }
 #newSearchListBox input,
-#newSearchBox input {
+#newSearchBox input,
+.sej-dialog-box input {
   width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--border-color-sej);
@@ -577,7 +585,8 @@ span.iqxin-additem:hover {
   opacity: 0.6;
 }
 #newSearchListBox input:focus,
-#newSearchBox input:focus {
+#newSearchBox input:focus,
+.sej-dialog-box input:focus {
   background: var(--sej-input-bg);
   border-color: var(--sej-accent);
   box-shadow: 0 0 0 3px var(--sej-focus-ring);
@@ -596,6 +605,16 @@ span.iqxin-additem:hover {
 }
 .addItemBoxBtn:hover {
   background: var(--sej-surface-hover);
+}
+.sej-dialog-danger {
+  margin-right: auto;
+  border-color: var(--sej-danger);
+  color: var(--sej-danger);
+}
+.sej-dialog-danger:hover {
+  background: var(--sej-danger-weak);
+  border-color: var(--sej-danger);
+  color: var(--sej-danger);
 }
 #xin-centerDisplay select,
 #xin-newtab select {
@@ -620,18 +639,6 @@ span.iqxin-additem:hover {
 #xin-newtab select option {
   background: var(--sej-input-bg);
   color: var(--font-color-qxin);
-}
-#titleEdit {
-  width: 8em;
-  box-sizing: border-box;
-  border: 1px solid var(--sej-accent);
-  border-radius: 6px;
-  padding: 2px 6px;
-  background: var(--sej-input-bg);
-  color: var(--font-color-qxin);
-  font-family: inherit;
-  font-size: 13px;
-  outline: none;
 }
 .iqxin-closeBtn,
 .iqxin-enterBtn {

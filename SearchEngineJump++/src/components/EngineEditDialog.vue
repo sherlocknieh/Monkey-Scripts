@@ -16,7 +16,7 @@ const props = defineProps({
   busy: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['submit', 'cancel']);
+const emit = defineEmits(['submit', 'cancel', 'delete']);
 
 const form = reactive({
   name: props.initial.name || '',
@@ -242,6 +242,10 @@ function submit() {
       <span>GBK 编码</span>
     </label>
     <div class="sej-dialog-actions">
+      <button v-if="mode === 'edit'" type="button"
+        class="addItemBoxBtn sej-dialog-danger" :disabled="busy" @click="$emit('delete')">
+        删除
+      </button>
       <button class="addItemBoxBtn iqxin-closeBtn" :disabled="busy" @click="$emit('cancel')">
         取消
       </button>

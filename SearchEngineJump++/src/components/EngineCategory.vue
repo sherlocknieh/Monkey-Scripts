@@ -18,6 +18,7 @@ const triggerEl = ref(null);
 const listEl = ref(null);
 const shown = ref(false);
 const active = ref(false);
+const pinned = ref(false);
 const top = ref('-10000px');
 const left = ref('0px');
 
@@ -95,9 +96,32 @@ async function show() {
 }
 
 function scheduleHide() {
-  if (isPointerInside()) return;
+  if (pinned.value || isPointerInside()) return;
   active.value = false;
   shown.value = false;
+}
+
+function hide() {
+  active.value = false;
+  shown.value = false;
+}
+
+// 点击类别固定下拉面板，再次点击收起；固定后不再响应指针离开
+function onTriggerClick() {
+  if (pinned.value) {
+    pinned.value = false;
+    hide();
+    return;
+  }
+  pinned.value = true;
+  show();
+  if (props.allOpen) emit('jumpAll');
+}
+
+function onEngineJump(engine) {
+  pinned.value = false;
+  hide();
+  emit('jump', engine);
 }
 
 // 用指针坐标统一判定是否仍在触发器/子菜单范围内，
@@ -107,19 +131,29 @@ function onDocMouseMove(e) {
   pointer.y = e.clientY;
   if (!shown.value) return;
 
-  if (isPointerInside()) {
+  if (pinned.value || isPointerInside()) {
     active.value = true;
   } else {
     scheduleHide();
   }
 }
 
+function onDocPointerDown(e) {
+  if (!pinned.value) return;
+  const path = e.composedPath ? e.composedPath() : [];
+  if (path.includes(triggerEl.value) || path.includes(listEl.value)) return;
+  pinned.value = false;
+  hide();
+}
+
 onMounted(() => {
   document.addEventListener('mousemove', onDocMouseMove);
+  document.addEventListener('pointerdown', onDocPointerDown);
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener('mousemove', onDocMouseMove);
+  document.removeEventListener('pointerdown', onDocPointerDown);
 });
 </script>
 
@@ -129,7 +163,9 @@ onBeforeUnmount(() => {
       ref="triggerEl"
       class="sej-engine sej-drop-list-trigger"
       :class="{ 'sej-drop-list-trigger-shown': active }"
-      @click.prevent.stop="allOpen ? $emit('jumpAll') : $emit('jump', engines[0])"
+      aria-haspopup="true"
+      :aria-expanded="shown"
+      @click.prevent.stop="onTriggerClick"
     >
       <img
         v-if="iconMode && getFaviconSrc(engines[0])"
@@ -160,7 +196,7 @@ onBeforeUnmount(() => {
           v-for="engine in engines"
           :key="engine.name + engine.url"
           :engine="engine"
-          @jump="$emit('jump', $event)"
+          @jump="onEngineJump"
         />
       </div>
     </Teleport>
