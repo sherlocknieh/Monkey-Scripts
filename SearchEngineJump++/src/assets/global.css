@@ -43,7 +43,7 @@
   position: absolute;
   width: auto;
   min-width: min(720px, calc(100vw - 32px));
-  max-width: calc(100vw - 32px);
+  max-width: min(960px, calc(100vw - 32px));
   max-height: calc(100vh - 48px);
   margin: 0;
   overflow: visible;
