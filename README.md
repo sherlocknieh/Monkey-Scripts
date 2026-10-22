@@ -1,35 +1,9 @@
 ## 油猴脚本
 
-- [SearchEngineJump++](https://github.com/sherlocknieh/Monkey-Scripts/raw/main/SearchEngineJump++/dist/SearchEngineJump++.user.js)
+- [SearchEngineJump++](https://github.com/sherlocknieh/Monkey-Scripts/raw/main/dist/SearchEngineJump++.user.js)
 
-- [AliPanBatchRename](https://github.com/sherlocknieh/Monkey-Scripts/raw/main/AlipanBatchRename/dist/alipan-batch-rename.user.js)
+- [AlipanBatchRename](https://github.com/sherlocknieh/Monkey-Scripts/raw/main/AlipanBatchRename/dist/alipan-batch-rename.user.js)
+- [DeepSeek-KaTeX-Copy-Fix](https://github.com/sherlocknieh/Monkey-Scripts/raw/main/deepseek-katex-copy-fix.user.js)
 
 - [PornHubTool](https://github.com/sherlocknieh/Monkey-Scripts/raw/main/PornHubTool/dist/pornhub-tool.user.js
 )
-
-- [DeepSeek-KaTeX-Copy-Fix](https://github.com/sherlocknieh/Monkey-Scripts/raw/main/deepseek-katex-copy-fix.user.js)
-
-
-
-## 开发指南
-
-项目使用 [vite-plugin-monkey](https://github.com/lisonge/vite-plugin-monkey) 构建
-
-
-- **创建项目**
-    ```bash
-    npm create monkey
-    ```
-
-- **开发调试**
-    ```bash
-    pnpm i
-    pnpm dev
-    ```
-    浏览器打开 `http://localhost:5173`，即可实时预览和调试脚本。
-
-
-- **打包构建**
-    ```bash
-    pnpm build
-    ```

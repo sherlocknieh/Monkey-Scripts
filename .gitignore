@@ -1,5 +1,4 @@
-
-node_modules
-*.local
-.vscode/*
-.github/*
+*
+!gitignore
+!simple-scripts/*
+!README.md
