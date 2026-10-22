@@ -69,6 +69,7 @@ const editingCategory = ref(-1);
 const engineDialog = ref(null);
 const engineSaving = ref(false);
 const saving = ref(false);
+const loadingIcons = ref(false);
 const configOpen = ref(false);
 const online = ref(false);
 
@@ -154,33 +155,43 @@ async function save() {
     if (saving.value) return;
     saving.value = true;
     try {
-        const pending = remoteFaviconEngines().length;
-        let converted = 0;
-        let failed = 0;
-        if (pending) {
-            showToast(`正在内嵌 ${pending} 个图标…`, 60000);
-            ({ converted, failed } = await embedRemoteFavicons());
-        }
         const backend = settings.applySettings(buildResult());
-        const parts = [];
-        if (converted) parts.push(`已内嵌 ${converted} 个图标`);
-        if (failed) parts.push(`${failed} 个获取失败`);
-        const suffix = parts.length ? `，${parts.join('，')}` : '';
         if (backend === 'memory') {
             showToast('保存失败：存储不可用，请用“配置文件”复制备份', 5000);
             return;
         }
         if (backend === 'local') {
             showToast(
-                `已保存${suffix}（当前仅本网站生效：脚本管理器未提供跨站点存储）`,
+                '已保存（当前仅本网站生效：脚本管理器未提供跨站点存储）',
                 4000,
             );
         } else {
-            showToast(`保存成功${suffix}`);
+            showToast('保存成功');
         }
         setTimeout(requestRestart, 0);
     } finally {
         saving.value = false;
+    }
+}
+
+async function loadAllIcons() {
+    if (loadingIcons.value || saving.value) return;
+    const pending = remoteFaviconEngines().length;
+    if (!pending) {
+        showToast('没有需要加载的图标');
+        return;
+    }
+    loadingIcons.value = true;
+    try {
+        showToast(`正在内嵌 ${pending} 个图标…`, 60000);
+        const { converted, failed } = await embedRemoteFavicons();
+        const parts = [];
+        if (converted) parts.push(`已内嵌 ${converted} 个图标`);
+        if (!converted && !failed) parts.push('没有可加载的图标');
+        else if (failed) parts.push(`${failed} 个获取失败`);
+        showToast(`${parts.join('，')}，保存后生效`, 4000);
+    } finally {
+        loadingIcons.value = false;
     }
 }
 
@@ -217,13 +228,13 @@ function close() {
 function toggleCategory(index) {
     const category = draft.categories[index];
     category.enabled = !category.enabled;
-    showToast(category.enabled ? '启用' : '禁用');
+    showToast(category.enabled ? '启用' : '隐藏');
 }
 
 function toggleEngine(ci, ei) {
     const engine = draft.categories[ci].engines[ei];
     engine.disable = !engine.disable;
-    showToast(engine.disable ? '禁用' : '启用');
+    showToast(engine.disable ? '隐藏' : '启用');
 }
 
 function pushUndo(entry) {
@@ -674,10 +685,14 @@ onBeforeUnmount(() => {
                                 <option :value="1">新标签页</option>
                             </select>
                         </span>
+                        <span id="xin-loadIcons" title="把所有远程图标内嵌为 data 链接"
+                            :class="{ 'sej-loading': loadingIcons }" @click="loadAllIcons">
+                            {{ loadingIcons ? '加载中…' : '加载所有图标缓存' }}
+                        </span>
                     </div>
                     <div class="sej-footer-actions">
                         <span id="xin-save" title="save & close" :class="{ 'sej-saving': saving }" @click="save">
-                            {{ saving ? '处理图标中…' : '保存并关闭' }}
+                            {{ saving ? '保存中…' : '保存并关闭' }}
                         </span>
                     </div>
                 </div>

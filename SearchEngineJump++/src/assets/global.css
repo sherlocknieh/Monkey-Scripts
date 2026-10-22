@@ -331,6 +331,11 @@
   opacity: 0.6;
   pointer-events: none;
 }
+#btnEle span.sej-loading {
+  cursor: progress;
+  opacity: 0.6;
+  pointer-events: none;
+}
 #btnEle span.iqxin-btn-active {
   background: var(--sej-accent-weak);
   border-color: var(--sej-accent);
@@ -474,18 +479,6 @@ span.iqxin-additem:hover {
 .sej-field > span {
   opacity: 0.65;
 }
-.sej-field-data {
-  display: block;
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--sej-accent);
-  font-size: 12px;
-  user-select: text;
-  -webkit-user-select: text;
-}
 .sej-field-row {
   display: flex;
   align-items: center;
@@ -529,6 +522,11 @@ span.iqxin-additem:hover {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+.sej-data-line input {
+  flex: 1 1 0;
+  width: auto;
   min-width: 0;
 }
 .sej-field-value {

@@ -26,8 +26,73 @@ const form = reactive({
   gbk: Boolean(props.initial.gbk),
 });
 
-const titleInput = ref(null);
+const urlInput = ref(null);
 const initialFavicon = (props.initial.favicon || '').trim();
+
+// 常见二级后缀，如 example.com.cn 取 example
+const secondLevelSuffixes = new Set([
+  'com', 'net', 'org', 'gov', 'edu', 'co', 'ac', 'or', 'ne', 'go', 'adm',
+]);
+
+function titleFromUrl(raw) {
+  const value = String(raw || '').trim();
+  if (!value) return '';
+  let host;
+  try {
+    host = new URL(value.includes('://') ? value : `https://${value}`).hostname;
+  } catch {
+    return '';
+  }
+  host = host.replace(/^www\./i, '');
+  if (/^\d+(\.\d+){3}$/.test(host)) return host;
+  if (!host || !host.includes('.')) return '';
+  const parts = host.split('.').filter(Boolean);
+  // 取可注册域名（跳过 zh./m./wap. 等子域），如 zh.wikipedia.org -> Wikipedia
+  let suffixLength = 1;
+  const last = parts[parts.length - 1] || '';
+  const secondLast = (parts[parts.length - 2] || '').toLowerCase();
+  if (last.length === 2 && secondLevelSuffixes.has(secondLast)) {
+    suffixLength = 2;
+  }
+  const label = parts[parts.length - suffixLength - 1] || parts[0];
+  return label ? label.charAt(0).toUpperCase() + label.slice(1) : '';
+}
+
+function faviconFromUrl(raw) {
+  const value = String(raw || '').trim();
+  if (!value) return '';
+  try {
+    const url = new URL(value.includes('://') ? value : `https://${value}`);
+    if (!url.hostname.includes('.')) return '';
+    return `${url.origin}/favicon.ico`;
+  } catch {
+    return '';
+  }
+}
+
+// 标题/图标为空（或未手动改过）时，随链接自动更新
+const titleEdited = ref(Boolean((props.initial.name || '').trim()));
+const faviconEdited = ref(Boolean((props.initial.favicon || '').trim()));
+
+function markTitleEdited() {
+  titleEdited.value = true;
+}
+
+function markFaviconEdited() {
+  faviconEdited.value = true;
+}
+
+watch(
+  () => form.url,
+  () => {
+    if (!titleEdited.value || !form.name.trim()) {
+      form.name = titleFromUrl(form.url);
+    }
+    if (!faviconEdited.value || !form.favicon.trim()) {
+      form.favicon = faviconFromUrl(form.url);
+    }
+  },
+);
 
 const previewData = ref('');
 const previewLoading = ref(false);
@@ -35,8 +100,21 @@ const previewFailed = ref(false);
 const previewCache = new Map();
 let previewToken = 0;
 
-const dataIconLink = computed(() => previewData.value);
+const dataIconLink = computed(() => previewData.value.trim());
+const previewImage = computed(() => /^data:image\//i.test(dataIconLink.value));
 const canPreview = computed(() => /^(https?:\/\/|data:)/i.test(form.favicon.trim()));
+
+// 用户手动填写 data 链接后，不再被图标转换结果覆盖
+const dataEdited = ref(false);
+
+function markDataEdited() {
+  dataEdited.value = true;
+}
+
+function setPreviewData(value) {
+  previewData.value = value;
+  dataEdited.value = false;
+}
 
 // 输入变化时清空旧预览，避免 data 链接与当前地址不对应
 watch(
@@ -46,15 +124,16 @@ watch(
     const url = value.trim();
     previewLoading.value = false;
     previewFailed.value = false;
+    if (dataEdited.value) return;
     if (/^data:/i.test(url)) {
-      previewData.value = url;
+      setPreviewData(url);
       return;
     }
     if (url === initialFavicon && props.initial.faviconData) {
-      previewData.value = props.initial.faviconData;
+      setPreviewData(props.initial.faviconData);
       return;
     }
-    previewData.value = '';
+    setPreviewData('');
   },
   { immediate: true },
 );
@@ -63,22 +142,23 @@ async function previewIcon() {
   if (props.busy || previewLoading.value) return;
   const url = form.favicon.trim();
   if (/^data:/i.test(url)) {
-    previewData.value = url;
+    setPreviewData(url);
     previewFailed.value = false;
     return;
   }
   if (!/^https?:\/\//i.test(url)) return;
   if (url === initialFavicon && props.initial.faviconData) {
-    previewData.value = props.initial.faviconData;
+    setPreviewData(props.initial.faviconData);
     return;
   }
   if (previewCache.has(url)) {
-    previewData.value = previewCache.get(url);
+    setPreviewData(previewCache.get(url));
     previewFailed.value = false;
     return;
   }
 
   const token = ++previewToken;
+  const previous = previewData.value;
   previewData.value = '';
   previewFailed.value = false;
   previewLoading.value = true;
@@ -86,14 +166,15 @@ async function previewIcon() {
   if (token !== previewToken) return;
   previewLoading.value = false;
   if (result !== url) {
-    previewData.value = result;
+    setPreviewData(result);
     previewCache.set(url, result);
   } else {
+    previewData.value = previous;
     previewFailed.value = true;
   }
 }
 
-onMounted(() => titleInput.value?.focus());
+onMounted(() => urlInput.value?.focus());
 
 onBeforeUnmount(() => {
   previewToken++;
@@ -106,7 +187,7 @@ function submit() {
     url: form.url.indexOf('://') === -1 ? 'https://' + form.url : form.url,
     favicon: form.favicon || props.resolveIcon(form.url),
     // 转换中的旧结果不能用于新链接，交给保存流程重新抓取
-    faviconData: previewLoading.value ? '' : previewData.value,
+    faviconData: previewLoading.value ? '' : previewData.value.trim(),
     blank: form.blank,
     gbk: form.gbk,
   });
@@ -119,17 +200,19 @@ function submit() {
       {{ mode === 'edit' ? '编辑搜索引擎' : '添加搜索引擎' }}
     </div>
     <label class="sej-field">
-      <span>标题</span>
-      <input ref="titleInput" v-model="form.name" placeholder="必填" :disabled="busy" />
+      <span>链接</span>
+      <input ref="urlInput" v-model="form.url" placeholder="必填" :disabled="busy" />
     </label>
     <label class="sej-field">
-      <span>链接</span>
-      <input v-model="form.url" placeholder="必填" :disabled="busy" />
+      <span>标题</span>
+      <input v-model="form.name" placeholder="必填，留空自动取域名" :disabled="busy"
+        @input="markTitleEdited" />
     </label>
     <div class="sej-field">
       <span>图标</span>
       <div class="sej-field-row">
-        <input v-model="form.favicon" placeholder="选填，原始链接，保存时自动内嵌" :disabled="busy" />
+        <input v-model="form.favicon" placeholder="选填，默认 域名/favicon.ico" :disabled="busy"
+          @input="markFaviconEdited" />
         <button type="button" class="sej-icon-preview-btn"
           :disabled="busy || previewLoading || !canPreview" @click="previewIcon">
           {{ previewLoading ? '转换中…' : '预览' }}
@@ -137,14 +220,15 @@ function submit() {
       </div>
     </div>
     <div class="sej-field">
-      <span>data 链接</span>
+      <span>图标缓存</span>
       <div class="sej-data-line">
-        <img v-if="previewData" class="sej-icon-preview" :src="previewData" alt="" />
-        <span v-if="dataIconLink" class="sej-field-data" :title="dataIconLink">{{ dataIconLink }}</span>
-        <span v-else-if="previewLoading" class="sej-field-value">转换中…</span>
-        <span v-else-if="previewFailed" class="sej-field-value">转换失败（保存时会重试）</span>
-        <span v-else class="sej-field-value">无（点击“预览”后转换）</span>
+        <input v-model="previewData" class="sej-data-input"
+          placeholder="选填，可粘贴 data:image/... 链接" :disabled="busy"
+          @input="markDataEdited" />
+        <img v-if="previewImage" class="sej-icon-preview" :src="dataIconLink" alt="" />
       </div>
+      <span v-if="previewLoading" class="sej-field-value">转换中…</span>
+      <span v-else-if="previewFailed" class="sej-field-value">转换失败（保存时会重试）</span>
     </div>
     <label class="sej-field">
       <span>打开方式</span>
