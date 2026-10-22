@@ -5,8 +5,9 @@ import globalCss from './assets/global.css?raw';
 import { initialize, getRoot, getHost, addStyle, reset } from './core/shadow.js';
 import { applyDarkModeIfNeeded, watchDarkModeChanges } from './core/darkMode.js';
 import { onRestartRequest } from './core/appControl.js';
-import { useSettings } from './stores/settings.js';
-import { openSettingPanel, closeSettingPanel } from './stores/ui.js';
+import { useSettings, STORAGE_KEY } from './stores/settings.js';
+import { openSettingPanel, closeSettingPanel, showToast, ui } from './stores/ui.js';
+import { initStorage, pullLatest, watchValue } from './core/storage.js';
 
 // 严格 CSP 页面的兼容样式
 const CSP_COMPAT_STYLE = `
@@ -112,19 +113,37 @@ function boot() {
   app.mount(getRoot());
 
   if (!menuRegistered) {
-    try {
-      GM_registerMenuCommand('设置菜单', openSettingPanel);
-    } catch (e) {
-      console.warn('[SEJ] 注册菜单命令失败', e);
+    const gmNamespace =
+      typeof globalThis !== 'undefined' ? globalThis.GM : undefined;
+    const gmMenu =
+      gmNamespace && typeof gmNamespace['registerMenuCommand'] === 'function'
+        ? gmNamespace['registerMenuCommand'].bind(gmNamespace)
+        : null;
+    const registerMenu =
+      typeof GM_registerMenuCommand === 'function'
+        ? GM_registerMenuCommand
+        : gmMenu;
+    if (registerMenu) {
+      try {
+        registerMenu('设置菜单', openSettingPanel);
+        menuRegistered = true;
+      } catch (e) {
+        console.warn('[SEJ] 注册菜单命令失败', e);
+      }
+    } else {
+      menuRegistered = true;
+      console.info('[SEJ] 当前脚本管理器不支持菜单命令，可使用跳转条右侧的设置按钮');
     }
-    menuRegistered = true;
   }
 }
 
-function startScript() {
+async function startScript() {
   if (window.self != window.top) return;
 
   printBanner();
+
+  // 先探测存储后端并预加载配置（兼容仅提供异步 GM.getValue 的管理器）
+  await initStorage([STORAGE_KEY]);
 
   const needDelay = DELAY_LIST.some((re) => location.href.search(re) !== -1);
   if (needDelay) {
@@ -187,6 +206,47 @@ function listenUrlChange() {
   });
 }
 
+let settingsSyncStarted = false;
+let settingsSyncTimer = null;
+let pollTimer = null;
+
+function applyRemoteSettings() {
+  if (ui.settingPanelOpen) {
+    showToast('其他页面已更新设置，关闭设置面板后刷新页面生效', 3000);
+    return;
+  }
+  if (!useSettings().reload()) return;
+  restart();
+  showToast('设置已从其他页面同步');
+}
+
+function setupSettingsSync() {
+  if (settingsSyncStarted) return;
+  settingsSyncStarted = true;
+
+  watchValue(STORAGE_KEY, () => {
+    clearTimeout(settingsSyncTimer);
+    settingsSyncTimer = setTimeout(applyRemoteSettings, 200);
+  });
+
+  // 部分管理器（如 Greasemonkey 4）没有变更监听，靠轮询兜底
+  const poll = async () => {
+    if (ui.settingPanelOpen || document.hidden) return;
+    const latest = await pullLatest(STORAGE_KEY);
+    if (latest) applyRemoteSettings();
+  };
+
+  clearInterval(pollTimer);
+  pollTimer = setInterval(poll, 2000);
+
+  // 切回标签页时立即检查一次，避免最多 2 秒的等待
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) poll();
+  });
+  window.addEventListener('focus', poll);
+}
+
 onRestartRequest(restart);
 startScript();
 listenUrlChange();
+setupSettingsSync();

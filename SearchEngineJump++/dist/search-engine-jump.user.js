@@ -1,21 +1,30 @@
 // ==UserScript==
 // @name         SearchEngineJump++
 // @namespace    npm/vite-plugin-monkey
-// @version      2026.10.22.05
+// @version      2026.10.22.20
 // @author       NLF & 锐经 & iqxin & MUTED64
 // @description  Fork 版本搜索引擎跳转脚本，Vue 重构版。在搜索页插入跳转小横条，支持划词搜索、分类下拉、设置菜单等。
 // @license      MIT
 // @icon         https://www.google.com/favicon.ico
 // @match        *://*/*
 // @exclude      *://mega.nz/*
+// @connect      *
+// @grant        GM.addValueChangeListener
+// @grant        GM.deleteValue
+// @grant        GM.getValue
+// @grant        GM.removeValueChangeListener
+// @grant        GM.setValue
 // @grant        GM_addStyle
+// @grant        GM_addValueChangeListener
 // @grant        GM_deleteValue
 // @grant        GM_getValue
 // @grant        GM_info
 // @grant        GM_openInTab
 // @grant        GM_registerMenuCommand
+// @grant        GM_removeValueChangeListener
 // @grant        GM_setClipboard
 // @grant        GM_setValue
+// @grant        GM_xmlhttpRequest
 // @grant        window.onurlchange
 // @noframes
 // ==/UserScript==
@@ -4665,6 +4674,7 @@
 	var _GM_registerMenuCommand = (() => typeof GM_registerMenuCommand != "undefined" ? GM_registerMenuCommand : void 0)();
 	var _GM_setClipboard = (() => typeof GM_setClipboard != "undefined" ? GM_setClipboard : void 0)();
 	var _GM_setValue = (() => typeof GM_setValue != "undefined" ? GM_setValue : void 0)();
+	var _GM_xmlhttpRequest = (() => typeof GM_xmlhttpRequest != "undefined" ? GM_xmlhttpRequest : void 0)();
 	var ui = reactive({
 		settingPanelOpen: false,
 		toastText: "",
@@ -7033,33 +7043,246 @@
 		...codingRules
 	];
 	var memoryFallback = new Map();
-	function hasGM() {
+	var asyncCache = new Map();
+	var LOCAL_PREFIX = "sej:storage:";
+	var TS_SUFFIX = ":updatedAt";
+	var PROBE_KEY = "sej:probe:" + Date.now();
+	var backend = "local";
+	var readyPromise = null;
+	var warned = false;
+	function gmNamespace() {
+		return typeof globalThis !== "undefined" ? globalThis.GM : void 0;
+	}
+	function hasSyncGM() {
 		return typeof _GM_getValue === "function" && typeof _GM_setValue === "function";
 	}
-	function getValue(key, defaultValue) {
-		if (hasGM()) try {
-			return _GM_getValue(key, defaultValue);
+	function hasAsyncGM() {
+		const gm = gmNamespace();
+		return Boolean(gm && typeof gm["getValue"] === "function" && typeof gm["setValue"] === "function");
+	}
+	function readLocal(key) {
+		try {
+			const raw = localStorage.getItem(LOCAL_PREFIX + key);
+			return raw === null ? void 0 : JSON.parse(raw);
 		} catch (e) {
-			console.warn("[SEJ] GM_getValue 失败，回退内存存储", e);
+			return;
 		}
+	}
+	function writeLocal(key, value) {
+		try {
+			localStorage.setItem(LOCAL_PREFIX + key, JSON.stringify(value));
+			return true;
+		} catch (e) {
+			console.warn("[SEJ] localStorage 写入失败，回退内存存储", e);
+			return false;
+		}
+	}
+	function removeLocal(key) {
+		try {
+			localStorage.removeItem(LOCAL_PREFIX + key);
+		} catch (e) {}
+	}
+	function isPresent(value) {
+		return value !== void 0 && value !== null;
+	}
+	function warnOnce() {
+		if (warned) return;
+		warned = true;
+		console.warn("[SEJ] 未检测到可用的脚本管理器存储（GM_getValue/GM.setValue），已改用 localStorage：配置仅在当前站点生效，跳转到其他网站会回到默认设置。");
+	}
+	async function probeSyncGM() {
+		if (!hasSyncGM()) return false;
+		try {
+			const token = String(Math.random());
+			_GM_setValue(PROBE_KEY, token);
+			return _GM_getValue(PROBE_KEY) === token;
+		} catch (e) {
+			return false;
+		} finally {
+			try {
+				if (typeof _GM_deleteValue === "function") _GM_deleteValue(PROBE_KEY);
+			} catch (e) {}
+		}
+	}
+	async function probeAsyncGM() {
+		if (!hasAsyncGM()) return false;
+		const gm = gmNamespace();
+		try {
+			const token = String(Math.random());
+			await gm["setValue"](PROBE_KEY, token);
+			return await gm["getValue"](PROBE_KEY) === token;
+		} catch (e) {
+			return false;
+		} finally {
+			try {
+				await gm["deleteValue"]?.(PROBE_KEY);
+			} catch (e) {}
+		}
+	}
+	async function preloadAsync(keys) {
+		const gm = gmNamespace();
+		await Promise.all(keys.map(async (key) => {
+			try {
+				const value = await gm["getValue"](key);
+				if (isPresent(value)) {
+					asyncCache.set(key, value);
+					return;
+				}
+				const local = readLocal(key);
+				if (isPresent(local)) {
+					asyncCache.set(key, local);
+					await gm["setValue"](key, local);
+				}
+			} catch (e) {
+				console.warn("[SEJ] 读取 GM 存储失败", key, e);
+			}
+		}));
+	}
+	function initStorage(keys = []) {
+		if (!readyPromise) readyPromise = (async () => {
+			if (await probeSyncGM()) backend = "gm-sync";
+			else if (await probeAsyncGM()) {
+				backend = "gm-async";
+				await preloadAsync(keys);
+			} else {
+				backend = "local";
+				warnOnce();
+			}
+			console.info(`[SEJ] 设置存储后端：${backend}`);
+			return backend;
+		})();
+		return readyPromise;
+	}
+	function getValue(key, defaultValue) {
+		if (backend === "gm-sync") try {
+			const value = _GM_getValue(key);
+			if (isPresent(value)) return value;
+		} catch (e) {
+			console.warn("[SEJ] GM_getValue 失败，尝试 localStorage", e);
+		}
+		else if (backend === "gm-async") {
+			if (asyncCache.has(key)) return asyncCache.get(key);
+		}
+		const local = readLocal(key);
+		if (isPresent(local)) return local;
 		if (memoryFallback.has(key)) return memoryFallback.get(key);
 		return defaultValue;
 	}
 	function setValue(key, value) {
-		if (hasGM()) try {
+		const updatedAt = Date.now();
+		let stored = "memory";
+		if (backend === "gm-sync") try {
 			_GM_setValue(key, value);
-			return;
+			_GM_setValue(key + TS_SUFFIX, updatedAt);
+			stored = "gm";
 		} catch (e) {
-			console.warn("[SEJ] GM_setValue 失败，回退内存存储", e);
+			console.warn("[SEJ] GM_setValue 失败，尝试 localStorage", e);
 		}
-		memoryFallback.set(key, value);
+		else if (backend === "gm-async") {
+			asyncCache.set(key, value);
+			const gm = gmNamespace();
+			try {
+				Promise.resolve(gm["setValue"](key, value)).catch((e) => console.warn("[SEJ] GM.setValue 失败", e));
+				stored = "gm";
+			} catch (e) {
+				console.warn("[SEJ] GM.setValue 失败", e);
+			}
+		}
+		if (writeLocal(key, value)) {
+			writeLocal(key + TS_SUFFIX, updatedAt);
+			if (stored === "memory") stored = "local";
+		} else if (stored === "memory") memoryFallback.set(key, value);
+		return stored;
+	}
+	function deleteValue(key) {
+		const gm = gmNamespace();
+		if (typeof _GM_deleteValue === "function") try {
+			_GM_deleteValue(key);
+			_GM_deleteValue(key + TS_SUFFIX);
+		} catch (e) {
+			console.warn("[SEJ] GM_deleteValue 失败", e);
+		}
+		else if (gm && typeof gm["deleteValue"] === "function") try {
+			Promise.resolve(gm["deleteValue"](key)).catch(() => {});
+			Promise.resolve(gm["deleteValue"](key + TS_SUFFIX)).catch(() => {});
+		} catch (e) {
+			console.warn("[SEJ] GM.deleteValue 失败", e);
+		}
+		removeLocal(key);
+		removeLocal(key + TS_SUFFIX);
+		memoryFallback.delete(key);
+		asyncCache.delete(key);
+	}
+	function watchValue(key, callback) {
+		const cleanups = [];
+		const gm = gmNamespace();
+		const handleRemote = (newValue) => {
+			if (!isPresent(newValue)) return;
+			asyncCache.set(key, newValue);
+			writeLocal(key, newValue);
+			callback(newValue);
+		};
+		const addListener = typeof GM_addValueChangeListener === "function" ? GM_addValueChangeListener : gm && typeof gm["addValueChangeListener"] === "function" ? gm["addValueChangeListener"].bind(gm) : null;
+		if (addListener) try {
+			const result = addListener(key, (name, oldValue, newValue, remote) => {
+				if (!remote) return;
+				handleRemote(newValue);
+			});
+			Promise.resolve(result).then((listenerId) => {
+				if (listenerId === void 0 || listenerId === null) return;
+				const remove = typeof GM_removeValueChangeListener === "function" ? GM_removeValueChangeListener : gm && typeof gm["removeValueChangeListener"] === "function" ? gm["removeValueChangeListener"].bind(gm) : null;
+				if (!remove) return;
+				cleanups.push(() => {
+					try {
+						remove(listenerId);
+					} catch (e) {}
+				});
+			}).catch(() => {});
+		} catch (e) {
+			console.warn("[SEJ] GM 变更监听注册失败", e);
+		}
+		const localKey = LOCAL_PREFIX + key;
+		const onStorage = (event) => {
+			if (event.key !== localKey || event.newValue === null) return;
+			try {
+				callback(JSON.parse(event.newValue));
+			} catch (e) {}
+		};
+		window.addEventListener("storage", onStorage);
+		cleanups.push(() => window.removeEventListener("storage", onStorage));
+		return () => {
+			while (cleanups.length) cleanups.pop()();
+		};
+	}
+	async function pullLatest(key) {
+		const gm = gmNamespace();
+		try {
+			if (backend === "gm-async") {
+				const value = await gm["getValue"](key);
+				if (!isPresent(value)) return null;
+				const current = asyncCache.get(key);
+				if (JSON.stringify(value) === JSON.stringify(current)) return null;
+				asyncCache.set(key, value);
+				writeLocal(key, value);
+				return value;
+			}
+			if (backend === "gm-sync") {
+				const value = _GM_getValue(key);
+				if (!isPresent(value)) return null;
+				if (JSON.stringify(value) === JSON.stringify(readLocal(key))) return null;
+				return value;
+			}
+		} catch (e) {
+			console.warn("[SEJ] 拉取最新设置失败", e);
+		}
+		return null;
 	}
 	var XIAOHONGSHU = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAXSSURBVGhD7ZprbBRVFMf/O1ta+qDQUh5CKS+hVQMVFBAiNjUBixJRUT4YE8UPPj5VjSlEjaIJiFWgpUaBgOURsFIVtNFQo5IoUouNBYq2gKVvoZXtA0rpdndbz+m5Q6ez27JEozvJ/pLp3HvuzOw99zzumUltMJAUGpH0YuyEl+6LHJkWHxIWbwf6jf/feICeerezvvCK49Cm5rqNFV0dFWqob6LpMfHp60dOyRxqt4cqUUDT6fF0rXacy8huqc/mPi26KJE1elpWiKb19q0AzzWNPKe1291a3Hmp2MbuVJpw5wmrWMIMW2ZWbUmyfe2oKevmhQ+fq+SWgy0TqmlhtuqpC2onhoRNUHJLUuN21tnciandgZadbhTOZhzdllaCYR001bY8QUUCjaAigUZQkUAjqEigYetJTO1R7YEJo8L4ptGkNuntaAHaLqsBH4wdBdx+q7QrKoHqemlfDzs9O3W+tBsdQNm1dya/8E+RGUlA/gfSztoBbNkrbV+sywAeSaPqhx679GmgsobuTwRiR9BCUDGhUUXkdsu1tX8CVXXA3GQZz3pD5CfKgW37gNZLwKnTgLNL5DwPpxM4UyV9A/4pMus24OMcaQ+mSFwM8H0eEDoEOHwUeP41kW99G0iZJ20jW+k5m+h5hbuBifFKaKK5FXjhTaCbprkni87dwMPPkDLn1AWCfzFi87OufPwhUYLZ/bmc/ylsqcxXgMQpNA/qs3uzq5uwr4mbvEa1+3jqMeDBRcD82cCREomP5Utk7OdSoKSMJr2MVoZcKOUu4Mdj9PAw4L1XgfChch27z4I7gI5Oca+T5C4L1ftb40UgJxcoPg5c+Au40kExQS7Ev8ecptVm14oeJjEXFQns+wIoPQXszAd+pbMJ3xZhH+eJLklVAh/MniHX8ME/+MC9QMxwNUg8ej+wYqkE+3c/Abs+UwNEC7kL90t/k/6BQrKgYZzjhvtHflECouGCKMML6QPfiugTaqNgG4jWNtUgRtD1Xa6+INYp+Ba42Kw6A5AwHrjlZjl0oqOkPyZOCYjJ9BIbEa463vhWZES0nJsNkzXTYhiLoet50jPJkrxqDGetnZ9KezDWvkwW2Ub3bVYCgl2SZWxVnRwK+KIDwMoVStAfb0WiIoAhIdI2rroZTo06bBGG7122WNrsAme906QXHLz+wkGe8SxZcZwS9OH9FH1STMsgrsVpUYctwiynFYxU5ucf27a+z7oDwZbc8QmlVkOWq6G4+mi/yPnIpQBvaJQxzqDTKYOZ8FZkkiGf19GGNRD151WD0PeARXfLmRk/lv6Qexkt54u8AuDdrcDG7UpAlFNFkLlF5Hy88yEpRgrp+NgOvBVpotSob5HHf5ezr22EU+RVSq0Mp1MmZ6fExd6DknU2U//fwkXJRIfjz4S3Irz9H6W943xTnyL63mCEsxSnVa67Dh4Cpk0C5syUsuMP2jc47fLum0x1l56mddh9ddn0yUo4AByvfMRS1aBj9/6yq6LaRC755zhyDdb8a1pVTn06RlfhEqOmQTa9556QvUSHN7u8L4H1q/rfz/Am93q6tN/K9lk79cKFZOEemssYJVCw15jwtgjDu3n+V6II+7Duk7wLF/4gbeZsNfD+LomHtBQlVHCQpi7wVuJG8FBdxW5q5Bv6fd1TDFy/aIwgt7qHCr5OqkBLTgLtV9SAAd7AuLAcRmf2ZRdtjIeLgKSppKRpNc1UkPtx4mB30ZMFL5g+2UhK6QvnyKLy7n7qjMhN+Ff9WgDfrmVBgooEGkFFAo2gIoFGUJFAQ3P3fiiyNqyDVuPqoprb2rAOGv+DiupbFtbBlhgakXgiYW5ZmN2mPhFaC6enx5Vce2yG3eFxOa7C07E4MlZ9/rAWqx2VqwraHQW974xFVy8Vtfd42lOGxqSGaDbv98gAhC3BSmxortvA/WuTZmXy25v2azabPdYeGhdt14Zrfn+9/m/g7FTlclbnXW7MW9lY/iRbQkaAvwEWveocTKmI8QAAAABJRU5ErkJggg==";
 	var X_ICON = "data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAB7ElEQVR4Ae1XMZLCMAwUdw0ldJQ8ATpKnkBJByUd8ALyA/gBdJTQUtHS8QT4AaRM5ctmThmfogQ75CYNmhGTbGJr45Vk0yAiQzXaF9VsHwIZAofDgYwxqo9GI/K16/X6cqyxvdVqmdvtZh6PhwmCIHXcw7vdrpFj8ny9XhsYxhe8lwWHw2EycLFYpNh0Ok2w8/nsFHy1WrkE1wnAN5tNMkGv10ux3W6XIab5fD5P3ovldCGrP2Ap4LiW8uRJAcIwe1wpArYU0FJimhQgxaQ9cqX4BZYCgSVmS8HBfRP1JQEsY1xKGSmAcTC+l0QrIWDraicVMBBA4O1265ScpQnAMbkMwphjub1HAI7EkxoDK7n0/gQQGATsCmDMo+z++Hf8E5CjPZ9PiqKIZrMZhWFIl8slxcbjMTWbTTqdTuRrXoz5i2WXRIL+WxWw2+Uml13rnJUT4K9E9nMFaF3SxiojoO1u2rJzl4z3/+oIcHBMLiUp2rDe3ozg+BIYtNee87KjGzLGndPx7JD/0K7xog2Gl30ymaSY1jm9CPhsrXnnBK1zOhHgCWWtF7l2TtA6p3S1E+73exoMBrRcLul4PJKL3e93arfbSUeMA1O/36eYPHU6nWQu7pyaqRlfZnezV05anhSN34va7PPXrHYCP+VaTG3LBV1KAAAAAElFTkSuQmCC";
 	var TIEBA = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGNsYXNzPSJpY29uIiB2aWV3Qm94PSIwIDAgMTAyNCAxMDI0IiB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCI+PHBhdGggZD0iTTc1MC4zNTEgNTQxLjA1Nkg2MDAuODI3djIxNC40NjdoMTE1LjUyMmMzNS40NTYgMCAzNC4wMDItNDEuMTI0IDM0LjAwMi00MS4xMjRWNTQxLjA1NnoiIGZpbGw9IiMyNDgyRkQiLz48cGF0aCBkPSJNODQ5LjkyIDUxLjJIMTc0LjA4Yy02Ny44NjYgMC0xMjIuODggNTUuMDE0LTEyMi44OCAxMjIuODh2Njc1Ljg0YzAgNjcuODY2IDU1LjAxNCAxMjIuODggMTIyLjg4IDEyMi44OGg2NzUuODRjNjcuODY2IDAgMTIyLjg4LTU1LjAxNCAxMjIuODgtMTIyLjg4VjE3NC4wOGMwLTY3Ljg2Ni01NS4wMTQtMTIyLjg4LTEyMi44OC0xMjIuODh6bS0zNTguNzA3IDc2OGMtOTcuNTk4IDAtMTQxLjU5OS03My4yNTItMTQxLjU5OS03My4yNTItNTEuODUgODAuNDQtMTQxLjU5NCA3My4wNzMtMTQxLjU5NCA3My4wNzN2LTYzLjUwNGMxMDguNzI5IDAgMTA4Ljc4LTEwNy4yMjggMTA4Ljc4LTEwNy4yMjhWMzE3LjQ2Nmg2NS42MjN2MzMwLjgyM2MwIDEwMi45MDcgMTA4Ljc4NSAxMDcuMjI4IDEwOC43ODUgMTA3LjIyOFY4MTkuMnptMC02MDguNTg0VjY1OC4zNUg0MjUuNTlWMjczLjM4OEgzMTQuNDM1Yy00MS41MjkgMC00MC43ODEgMzMuMTM2LTQwLjc4MSAzMy4xMzZWNjU4LjM0aC02NS42MjhWMzA2LjUzYzAtOTguMDg1IDEwNi40MDMtOTYuNjQgMTA2LjQwMy05Ni42NGgxNzYuNzg0di43MjZ6bTMyNC43NjEgNTAzLjc3OGMwIDEwMy45MTUtOTkuNjI1IDEwNC42MzItOTkuNjI1IDEwNC42MzJINTM1LjIwNFY0NzcuNTU4aDYwLjUxOFYyMDQuOGg2NS42MjN2NjcuODU1aDE1NC41MzJ2NjcuNzM4SDY2MS4zNDV2MTM3LjE2aDE1NC42M3YyMzYuODR6IiBmaWxsPSIjMjQ4MkZEIi8+PC9zdmc+";
 	var STORAGE_KEY = "searchEngineJumpData";
 	var SCRIPT_VERSION = "5.32.7";
-	var SCRIPT_MESSAGE = "$相关说明$(status: 这个在将来或许很重要)...(version: 若有新功能加入,靠这个版本号识别)...(addSearchItems: 允许更新时,添加新的搜索网站到你的搜索列表)...(modifySearchItems: 允许更新时,修改你的搜索列表中的项目)...(newtab: 新标签页打开。0为默认设置,1为新标签页打开)...(foldlist: 折叠当前搜索分类列表。true为折叠,false为展开。)...(debug: debug模式,开启后,控制台会输出一些信息,“关闭并保存”按钮将不会在刷新页面)...(fixedTop: 将搜索栏固定到顶端。 true开启,false关闭)...(fixedTopUpward: 固定顶端后，搜索栏下拉不会出现，只有上拉时才出现。 true开启,false关闭)...(baiduOffset: 在百度页面鼠标划过的菜单会出现位移,若有使用其他的style样式,可以修改这个来修复二级菜单的偏移)...(getIcon: 自己添加搜索后获取图标的方式。0为自动，能连接谷歌的情况下用谷歌获取，无法连接的情况下，域名加favicon.ico获取；1为域名加favicon获取，2为使用谷歌获取，3为使用dnspot的服务获取(不建议使用)。或者添加网址，关键字使用%s代替，未测试)...(allOpen:一键搜索，点击相关分类后，打开该分类下的所有搜索)...(HideTheSameLink:隐藏同站链接。默认开启,百度页面会隐藏百度搜索。如果想在同一个搜索网站,但是想通过不同语言来搜索, 可以选择false来实现)...(center:是否居中显示，主要是为了兼容脚本 ac 百度  ： 0 不居中，强制在左。 1, 强制居中 。 2,自动判断)...(icon: 图标的显示方式, 0 关闭文字, 只保留图标, 1 显示网站图标,2 显示抽象图标。当脚本中不存在抽象图标时,显示网站图标)...(transtion: 是否有动画效果, true为开启所有动画效果,false关闭所有动画(包括模糊效果)。)(selectSearch: 划词搜索功能, true为开启划词搜索,false关闭)(engineDetails: 第一个值为分类列表标题名称,第二个值与enginelist相关联,必须匹配,第三个值true为显示列表,false为禁用列表。排列顺序与跳转栏上的显示顺序相同，可以用它将分类列表按自己喜欢排序)...(engineList: 各个搜索的相关信息)(rules: 已弃用--将搜索样式插入到目标网页,同脚本中的rules设置相同,优先级高于脚本中自带的规则。自带了360搜索,可仿写)...";
+	var SCRIPT_MESSAGE = "$相关说明$(status: 这个在将来或许很重要)...(version: 若有新功能加入,靠这个版本号识别)...(addSearchItems: 允许更新时,添加新的搜索网站到你的搜索列表)...(modifySearchItems: 允许更新时,修改你的搜索列表中的项目)...(newtab: 新标签页打开。0为默认设置,1为新标签页打开)...(foldlist: 折叠当前搜索分类列表。true为折叠,false为展开。)...(debug: debug模式,开启后,控制台会输出一些信息,“关闭并保存”按钮将不会在刷新页面)...(fixedTop: 将搜索栏固定到顶端。 true开启,false关闭)...(fixedTopUpward: 固定顶端后，搜索栏下拉不会出现，只有上拉时才出现。 true开启,false关闭)...(baiduOffset: 在百度页面鼠标划过的菜单会出现位移,若有使用其他的style样式,可以修改这个来修复二级菜单的偏移)...(getIcon: 自己添加搜索后获取图标的方式。0为自动，能连接谷歌的情况下用谷歌获取，无法连接的情况下，域名加favicon.ico获取；1为域名加favicon获取，2为使用谷歌获取，3为使用dnspot的服务获取(不建议使用)。或者添加网址，关键字使用%s代替，未测试。保存设置时会把远程图标内嵌为 data URL 存入 faviconData，并保留原始链接 favicon，以兼容 Wikipedia 等严格 CSP 页面)...(allOpen:一键搜索，点击相关分类后，打开该分类下的所有搜索)...(HideTheSameLink:隐藏同站链接。默认开启,百度页面会隐藏百度搜索。如果想在同一个搜索网站,但是想通过不同语言来搜索, 可以选择false来实现)...(center:是否居中显示，主要是为了兼容脚本 ac 百度  ： 0 不居中，强制在左。 1, 强制居中 。 2,自动判断)...(icon: 图标的显示方式, 0 关闭文字, 只保留图标, 1 显示网站图标,2 显示抽象图标。当脚本中不存在抽象图标时,显示网站图标)...(transtion: 是否有动画效果, true为开启所有动画效果,false关闭所有动画(包括模糊效果)。)(selectSearch: 划词搜索功能, true为开启划词搜索,false关闭)(engineDetails: 第一个值为分类列表标题名称,第二个值与enginelist相关联,必须匹配,第三个值true为显示列表,false为禁用列表。排列顺序与跳转栏上的显示顺序相同，可以用它将分类列表按自己喜欢排序)...(engineList: 各个搜索的相关信息)(rules: 已弃用--将搜索样式插入到目标网页,同脚本中的rules设置相同,优先级高于脚本中自带的规则。自带了360搜索,可仿写)...";
 	function createDefaultSettings() {
 		return {
 			status: 1,
@@ -7227,7 +7450,19 @@
 			Object.assign(this.settingData, plain);
 			this.storedSettingData = this.settingData;
 			this.initEngineCategories();
-			setValue(STORAGE_KEY, this.settingData);
+			return setValue(STORAGE_KEY, this.settingData);
+		}
+		reload() {
+			const stored = getValue(STORAGE_KEY, null);
+			if (!stored || typeof stored !== "object") return false;
+			try {
+				if (this.settingData && JSON.stringify(stored) === JSON.stringify(this.settingData)) return false;
+			} catch (e) {}
+			this.storedSettingData = stored;
+			this.settingData = Object.assign({}, stored);
+			this.checkSettingDataIntegrity();
+			this.initEngineCategories();
+			return true;
 		}
 		initEngineCategories() {
 			this.settingData.engineList.engineCategories = [];
@@ -7366,6 +7601,24 @@
 		dropRoot = null;
 		constructableSheets.length = 0;
 	}
+	var pageStyleEl = null;
+	function addPageStyle(cssText) {
+		if (!cssText) return;
+		if (typeof _GM_addStyle === "function") try {
+			_GM_addStyle(cssText);
+			return;
+		} catch (e) {
+			console.warn("[SEJ] GM_addStyle 注入失败，回退到 <style>", e);
+		}
+		if (!pageStyleEl || !pageStyleEl.isConnected) {
+			pageStyleEl = document.createElement("style");
+			pageStyleEl.id = "sej-page-style";
+			const nonce = getCSPNonce();
+			if (nonce) pageStyleEl.setAttribute("nonce", nonce);
+			(document.head || document.documentElement).appendChild(pageStyleEl);
+		}
+		pageStyleEl.textContent += `\n${cssText}`;
+	}
 	function getElementBySelector(selector) {
 		if (!selector) return null;
 		if (selector.startsWith("css;")) return document.querySelector(selector.slice(4));
@@ -7395,7 +7648,7 @@
 	}
 	function applyStylish(rule) {
 		if (!rule?.stylish) return;
-		_GM_addStyle(rule.stylish);
+		addPageStyle(rule.stylish);
 		const scriptElementStyles = rule.stylish.match(/#sej-container(-wrapper)?\s*\{[^}]+\}/g);
 		if (scriptElementStyles) scriptElementStyles.forEach((ruleText) => addStyle(ruleText));
 	}
@@ -14979,6 +15232,86 @@
 			openInNewTab((engine.url || "").replaceAll("%s", encodedKeyword));
 		}
 	}
+	var ICON_TIMEOUT = 4e3;
+	var MAX_ICON_BYTES = 65536;
+	var EXTENSION_MIME = {
+		".ico": "image/x-icon",
+		".png": "image/png",
+		".jpg": "image/jpeg",
+		".jpeg": "image/jpeg",
+		".gif": "image/gif",
+		".webp": "image/webp",
+		".svg": "image/svg+xml",
+		".bmp": "image/bmp",
+		".avif": "image/avif"
+	};
+	function getHeader(headers, name) {
+		if (!headers) return "";
+		const match = headers.match(new RegExp(`^${name}:\\s*(.+)$`, "im"));
+		return match ? match[1].trim() : "";
+	}
+	function mimeFromUrl(url) {
+		const path = url.split(/[?#]/)[0].toLowerCase();
+		const dot = path.lastIndexOf(".");
+		if (dot === -1) return "";
+		return EXTENSION_MIME[path.slice(dot)] || "";
+	}
+	function arrayBufferToBase64(buffer) {
+		const bytes = new Uint8Array(buffer);
+		const CHUNK = 32768;
+		let binary = "";
+		for (let i = 0; i < bytes.length; i += CHUNK) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+		return btoa(binary);
+	}
+	function requestIcon(url) {
+		return new Promise((resolve) => {
+			if (typeof _GM_xmlhttpRequest !== "function") {
+				resolve(null);
+				return;
+			}
+			let settled = false;
+			const finish = (response) => {
+				if (settled) return;
+				settled = true;
+				resolve(response);
+			};
+			try {
+				_GM_xmlhttpRequest({
+					method: "GET",
+					url,
+					responseType: "arraybuffer",
+					timeout: ICON_TIMEOUT,
+					headers: { Accept: "image/*,*/*;q=0.8" },
+					onload: finish,
+					onerror: () => finish(null),
+					ontimeout: () => finish(null),
+					onabort: () => finish(null)
+				});
+			} catch (e) {
+				finish(null);
+			}
+		});
+	}
+	function getFaviconSrc(engine) {
+		return engine?.faviconData || engine?.favicon || "";
+	}
+	async function embedFavicon(url) {
+		const source = typeof url === "string" ? url.trim() : "";
+		if (!/^https?:\/\//i.test(source)) return source;
+		const response = await requestIcon(source);
+		if (!response || response.status < 200 || response.status >= 300) return source;
+		const buffer = response.response;
+		if (!buffer || buffer.byteLength === 0 || buffer.byteLength > MAX_ICON_BYTES) return source;
+		let mime = getHeader(response.responseHeaders, "content-type").split(";")[0].trim().toLowerCase();
+		if (!mime || mime === "application/octet-stream") mime = mimeFromUrl(source);
+		if (!/^image\//.test(mime)) return source;
+		try {
+			return `data:${mime};base64,${arrayBufferToBase64(buffer)}`;
+		} catch (e) {
+			console.warn("[SEJ] 图标转换失败:", source, e);
+			return source;
+		}
+	}
 	var _hoisted_1$6 = ["src"];
 	var _sfc_main$8 = {
 		__name: "EngineItem",
@@ -14999,10 +15332,10 @@
 				return openBlock(), createElementBlock("a", {
 					class: "sej-engine",
 					onClick: _cache[0] || (_cache[0] = withModifiers(($event) => emit("jump", __props.engine), ["prevent", "stop"]))
-				}, [__props.showIcon && __props.engine.favicon ? (openBlock(), createElementBlock("img", {
+				}, [__props.showIcon && unref(getFaviconSrc)(__props.engine) ? (openBlock(), createElementBlock("img", {
 					key: 0,
 					class: "sej-engine-icon",
-					src: __props.engine.favicon,
+					src: unref(getFaviconSrc)(__props.engine),
 					alt: ""
 				}, null, 8, _hoisted_1$6)) : createCommentVNode("", true), createBaseVNode("span", null, toDisplayString(__props.engine.name), 1)]);
 			};
@@ -15115,10 +15448,10 @@
 					ref: triggerEl,
 					class: normalizeClass(["sej-engine sej-drop-list-trigger", { "sej-drop-list-trigger-shown": active.value }]),
 					onClick: _cache[0] || (_cache[0] = withModifiers(($event) => __props.allOpen ? _ctx.$emit("jumpAll") : _ctx.$emit("jump", __props.engines[0]), ["prevent", "stop"]))
-				}, [__props.iconMode && __props.engines[0].favicon ? (openBlock(), createElementBlock("img", {
+				}, [__props.iconMode && unref(getFaviconSrc)(__props.engines[0]) ? (openBlock(), createElementBlock("img", {
 					key: 0,
 					class: "sej-engine-icon",
-					src: __props.engines[0].favicon,
+					src: unref(getFaviconSrc)(__props.engines[0]),
 					alt: ""
 				}, null, 8, _hoisted_1$5)) : createCommentVNode("", true), createBaseVNode("span", null, toDisplayString(__props.name), 1)], 2), (openBlock(), createBlock(Teleport, { to: unref(dropRoot) }, [createBaseVNode("div", {
 					ref_key: "listEl",
@@ -15428,14 +15761,39 @@
 	var _hoisted_1$2 = { id: "newSearchBox" };
 	var _hoisted_2$2 = { class: "sej-dialog-title" };
 	var _hoisted_3$1 = { class: "sej-field" };
-	var _hoisted_4$1 = { class: "sej-field" };
+	var _hoisted_4$1 = ["disabled"];
 	var _hoisted_5$1 = { class: "sej-field" };
-	var _hoisted_6$1 = { class: "sej-field" };
-	var _hoisted_7$1 = {
+	var _hoisted_6$1 = ["disabled"];
+	var _hoisted_7$1 = { class: "sej-field" };
+	var _hoisted_8$1 = { class: "sej-field-row" };
+	var _hoisted_9$1 = ["disabled"];
+	var _hoisted_10$1 = ["disabled"];
+	var _hoisted_11$1 = { class: "sej-field" };
+	var _hoisted_12$1 = { class: "sej-data-line" };
+	var _hoisted_13$1 = ["src"];
+	var _hoisted_14$1 = ["title"];
+	var _hoisted_15$1 = {
+		key: 2,
+		class: "sej-field-value"
+	};
+	var _hoisted_16$1 = {
+		key: 3,
+		class: "sej-field-value"
+	};
+	var _hoisted_17$1 = {
+		key: 4,
+		class: "sej-field-value"
+	};
+	var _hoisted_18$1 = { class: "sej-field" };
+	var _hoisted_19$1 = ["disabled"];
+	var _hoisted_20$1 = {
 		key: 0,
 		class: "sej-field-inline"
 	};
-	var _hoisted_8$1 = { class: "sej-dialog-actions" };
+	var _hoisted_21$1 = ["disabled"];
+	var _hoisted_22$1 = { class: "sej-dialog-actions" };
+	var _hoisted_23$1 = ["disabled"];
+	var _hoisted_24$1 = ["disabled"];
 	var _sfc_main$4 = {
 		__name: "EngineEditDialog",
 		props: {
@@ -15450,6 +15808,10 @@
 			resolveIcon: {
 				type: Function,
 				required: true
+			},
+			busy: {
+				type: Boolean,
+				default: false
 			}
 		},
 		emits: ["submit", "cancel"],
@@ -15464,12 +15826,70 @@
 				gbk: Boolean(props.initial.gbk)
 			});
 			const titleInput = ref(null);
+			const initialFavicon = (props.initial.favicon || "").trim();
+			const previewData = ref("");
+			const previewLoading = ref(false);
+			const previewFailed = ref(false);
+			const previewCache = new Map();
+			let previewToken = 0;
+			const dataIconLink = computed(() => previewData.value);
+			const canPreview = computed(() => /^(https?:\/\/|data:)/i.test(form.favicon.trim()));
+			watch(() => form.favicon, (value) => {
+				previewToken++;
+				const url = value.trim();
+				previewLoading.value = false;
+				previewFailed.value = false;
+				if (/^data:/i.test(url)) {
+					previewData.value = url;
+					return;
+				}
+				if (url === initialFavicon && props.initial.faviconData) {
+					previewData.value = props.initial.faviconData;
+					return;
+				}
+				previewData.value = "";
+			}, { immediate: true });
+			async function previewIcon() {
+				if (props.busy || previewLoading.value) return;
+				const url = form.favicon.trim();
+				if (/^data:/i.test(url)) {
+					previewData.value = url;
+					previewFailed.value = false;
+					return;
+				}
+				if (!/^https?:\/\//i.test(url)) return;
+				if (url === initialFavicon && props.initial.faviconData) {
+					previewData.value = props.initial.faviconData;
+					return;
+				}
+				if (previewCache.has(url)) {
+					previewData.value = previewCache.get(url);
+					previewFailed.value = false;
+					return;
+				}
+				const token = ++previewToken;
+				previewData.value = "";
+				previewFailed.value = false;
+				previewLoading.value = true;
+				const result = await embedFavicon(url);
+				if (token !== previewToken) return;
+				previewLoading.value = false;
+				if (result !== url) {
+					previewData.value = result;
+					previewCache.set(url, result);
+				} else previewFailed.value = true;
+			}
 			onMounted(() => titleInput.value?.focus());
+			onBeforeUnmount(() => {
+				previewToken++;
+			});
 			function submit() {
+				if (props.busy) return;
 				emit("submit", {
 					name: form.name,
 					url: form.url.indexOf("://") === -1 ? "https://" + form.url : form.url,
 					favicon: form.favicon || props.resolveIcon(form.url),
+					faviconData: previewLoading.value ? "" : previewData.value,
 					blank: form.blank,
 					gbk: form.gbk
 				});
@@ -15481,31 +15901,53 @@
 						ref_key: "titleInput",
 						ref: titleInput,
 						"onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => form.name = $event),
-						placeholder: "必填"
-					}, null, 512), [[vModelText, form.name]])]),
-					createBaseVNode("label", _hoisted_4$1, [_cache[7] || (_cache[7] = createBaseVNode("span", null, "链接", -1)), withDirectives(createBaseVNode("input", {
+						placeholder: "必填",
+						disabled: __props.busy
+					}, null, 8, _hoisted_4$1), [[vModelText, form.name]])]),
+					createBaseVNode("label", _hoisted_5$1, [_cache[7] || (_cache[7] = createBaseVNode("span", null, "链接", -1)), withDirectives(createBaseVNode("input", {
 						"onUpdate:modelValue": _cache[1] || (_cache[1] = ($event) => form.url = $event),
-						placeholder: "必填"
-					}, null, 512), [[vModelText, form.url]])]),
-					createBaseVNode("label", _hoisted_5$1, [_cache[8] || (_cache[8] = createBaseVNode("span", null, "图标", -1)), withDirectives(createBaseVNode("input", {
+						placeholder: "必填",
+						disabled: __props.busy
+					}, null, 8, _hoisted_6$1), [[vModelText, form.url]])]),
+					createBaseVNode("div", _hoisted_7$1, [_cache[8] || (_cache[8] = createBaseVNode("span", null, "图标", -1)), createBaseVNode("div", _hoisted_8$1, [withDirectives(createBaseVNode("input", {
 						"onUpdate:modelValue": _cache[2] || (_cache[2] = ($event) => form.favicon = $event),
-						placeholder: "选填，留空则自动获取"
-					}, null, 512), [[vModelText, form.favicon]])]),
-					createBaseVNode("label", _hoisted_6$1, [_cache[10] || (_cache[10] = createBaseVNode("span", null, "打开方式", -1)), withDirectives(createBaseVNode("select", {
+						placeholder: "选填，原始链接，保存时自动内嵌",
+						disabled: __props.busy
+					}, null, 8, _hoisted_9$1), [[vModelText, form.favicon]]), createBaseVNode("button", {
+						type: "button",
+						class: "sej-icon-preview-btn",
+						disabled: __props.busy || previewLoading.value || !canPreview.value,
+						onClick: previewIcon
+					}, toDisplayString(previewLoading.value ? "转换中…" : "预览"), 9, _hoisted_10$1)])]),
+					createBaseVNode("div", _hoisted_11$1, [_cache[9] || (_cache[9] = createBaseVNode("span", null, "data 链接", -1)), createBaseVNode("div", _hoisted_12$1, [previewData.value ? (openBlock(), createElementBlock("img", {
+						key: 0,
+						class: "sej-icon-preview",
+						src: previewData.value,
+						alt: ""
+					}, null, 8, _hoisted_13$1)) : createCommentVNode("", true), dataIconLink.value ? (openBlock(), createElementBlock("span", {
+						key: 1,
+						class: "sej-field-data",
+						title: dataIconLink.value
+					}, toDisplayString(dataIconLink.value), 9, _hoisted_14$1)) : previewLoading.value ? (openBlock(), createElementBlock("span", _hoisted_15$1, "转换中…")) : previewFailed.value ? (openBlock(), createElementBlock("span", _hoisted_16$1, "转换失败（保存时会重试）")) : (openBlock(), createElementBlock("span", _hoisted_17$1, "无（点击“预览”后转换）"))])]),
+					createBaseVNode("label", _hoisted_18$1, [_cache[11] || (_cache[11] = createBaseVNode("span", null, "打开方式", -1)), withDirectives(createBaseVNode("select", {
 						id: "iqxin-newTarget",
-						"onUpdate:modelValue": _cache[3] || (_cache[3] = ($event) => form.blank = $event)
-					}, [..._cache[9] || (_cache[9] = [createBaseVNode("option", { value: true }, "新标签页打开", -1), createBaseVNode("option", { value: false }, "当前页打开", -1)])], 512), [[vModelSelect, form.blank]])]),
-					__props.mode === "edit" ? (openBlock(), createElementBlock("label", _hoisted_7$1, [withDirectives(createBaseVNode("input", {
+						"onUpdate:modelValue": _cache[3] || (_cache[3] = ($event) => form.blank = $event),
+						disabled: __props.busy
+					}, [..._cache[10] || (_cache[10] = [createBaseVNode("option", { value: true }, "新标签页打开", -1), createBaseVNode("option", { value: false }, "当前页打开", -1)])], 8, _hoisted_19$1), [[vModelSelect, form.blank]])]),
+					__props.mode === "edit" ? (openBlock(), createElementBlock("label", _hoisted_20$1, [withDirectives(createBaseVNode("input", {
 						"onUpdate:modelValue": _cache[4] || (_cache[4] = ($event) => form.gbk = $event),
-						type: "checkbox"
-					}, null, 512), [[vModelCheckbox, form.gbk]]), _cache[11] || (_cache[11] = createBaseVNode("span", null, "GBK 编码", -1))])) : createCommentVNode("", true),
-					createBaseVNode("div", _hoisted_8$1, [createBaseVNode("button", {
+						type: "checkbox",
+						disabled: __props.busy
+					}, null, 8, _hoisted_21$1), [[vModelCheckbox, form.gbk]]), _cache[12] || (_cache[12] = createBaseVNode("span", null, "GBK 编码", -1))])) : createCommentVNode("", true),
+					createBaseVNode("div", _hoisted_22$1, [createBaseVNode("button", {
 						class: "addItemBoxBtn iqxin-closeBtn",
+						disabled: __props.busy,
 						onClick: _cache[5] || (_cache[5] = ($event) => _ctx.$emit("cancel"))
-					}, " 取消 "), createBaseVNode("button", {
+					}, " 取消 ", 8, _hoisted_23$1), createBaseVNode("button", {
 						class: "addItemBoxBtn iqxin-enterBtn",
+						disabled: __props.busy,
 						onClick: submit
-					}, " 确定 ")])
+					}, toDisplayString(__props.busy ? "获取图标中…" : "确定"), 9, _hoisted_24$1)])
 				]);
 			};
 		}
@@ -15650,6 +16092,7 @@
 		id: "xin-newtab",
 		title: "是否采用新标签页打开"
 	};
+	var _hoisted_34 = { class: "sej-footer-actions" };
 	var UNDO_DURATION = 5e3;
 	var _sfc_main$2 = {
 		__name: "SettingPanel",
@@ -15701,6 +16144,8 @@
 			const layerStyle = ref({});
 			const editingCategory = ref(-1);
 			const engineDialog = ref(null);
+			const engineSaving = ref(false);
+			const saving = ref(false);
 			const configOpen = ref(false);
 			const online = ref(false);
 			const undoStack = [];
@@ -15726,6 +16171,7 @@
 						url: engine.url,
 						favicon: engine.favicon
 					};
+					if (engine.faviconData) item.faviconData = engine.faviconData;
 					if (engine.blank) item.blank = "_blank";
 					if (engine.disable) item.disable = true;
 					if (engine.gbk) item.gbk = true;
@@ -15733,14 +16179,63 @@
 				});
 				return result;
 			}
-			function save() {
-				settings.applySettings(buildResult());
-				showToast("保存成功");
-				setTimeout(requestRestart, 0);
+			function remoteFaviconEngines() {
+				const list = [];
+				for (const category of draft.categories) for (const engine of category.engines) if (!engine.faviconData && /^https?:\/\//i.test(engine.favicon || "")) list.push(engine);
+				return list;
+			}
+			async function embedRemoteFavicons() {
+				const pending = remoteFaviconEngines();
+				let converted = 0;
+				let failed = 0;
+				const worker = async () => {
+					while (pending.length) {
+						const engine = pending.shift();
+						const original = engine.favicon;
+						const dataUrl = await embedFavicon(original);
+						if (dataUrl !== original) {
+							engine.faviconData = dataUrl;
+							converted++;
+						} else failed++;
+					}
+				};
+				const workers = Array.from({ length: Math.min(6, pending.length) }, () => worker());
+				await Promise.all(workers);
+				return {
+					converted,
+					failed
+				};
+			}
+			async function save() {
+				if (saving.value) return;
+				saving.value = true;
+				try {
+					const pending = remoteFaviconEngines().length;
+					let converted = 0;
+					let failed = 0;
+					if (pending) {
+						showToast(`正在内嵌 ${pending} 个图标…`, 6e4);
+						({converted, failed} = await embedRemoteFavicons());
+					}
+					const backend = settings.applySettings(buildResult());
+					const parts = [];
+					if (converted) parts.push(`已内嵌 ${converted} 个图标`);
+					if (failed) parts.push(`${failed} 个获取失败`);
+					const suffix = parts.length ? `，${parts.join("，")}` : "";
+					if (backend === "memory") {
+						showToast("保存失败：存储不可用，请用“配置文件”复制备份", 5e3);
+						return;
+					}
+					if (backend === "local") showToast(`已保存${suffix}（当前仅本网站生效：脚本管理器未提供跨站点存储）`, 4e3);
+					else showToast(`保存成功${suffix}`);
+					setTimeout(requestRestart, 0);
+				} finally {
+					saving.value = false;
+				}
 			}
 			function reset() {
 				if (confirm("将会删除用户设置！")) {
-					_GM_deleteValue(STORAGE_KEY);
+					deleteValue(STORAGE_KEY);
 					location.reload();
 				}
 			}
@@ -15899,23 +16394,38 @@
 					initial: { ...draft.categories[ci].engines[ei] }
 				};
 			}
-			function submitEngine(engine) {
+			function cancelEngineDialog() {
+				if (!engineSaving.value) engineDialog.value = null;
+			}
+			async function submitEngine(engine) {
 				const ctx = engineDialog.value;
-				if (!ctx) return;
+				if (!ctx || engineSaving.value) return;
 				if (!engine.name || !engine.url) {
 					alert("标题和链接必填");
 					return;
 				}
-				const list = draft.categories[ctx.ci].engines;
-				if (ctx.mode === "add") list.push({
-					...engine,
-					_id: nextId()
-				});
-				else list[ctx.ei] = {
-					...list[ctx.ei],
-					...engine
-				};
-				engineDialog.value = null;
+				engineSaving.value = true;
+				try {
+					const list = draft.categories[ctx.ci].engines;
+					const existing = ctx.mode === "edit" ? list[ctx.ei] : null;
+					const original = engine.favicon;
+					const embedded = /^data:/i.test(engine.faviconData || "") ? engine.faviconData : existing?.faviconData && existing.favicon === original ? existing.faviconData : await embedFavicon(original);
+					const next = ctx.mode === "add" ? {
+						...engine,
+						_id: nextId()
+					} : {
+						...existing,
+						...engine
+					};
+					next.favicon = original;
+					if (embedded !== original) next.faviconData = embedded;
+					else delete next.faviconData;
+					if (ctx.mode === "add") list.push(next);
+					else list[ctx.ei] = next;
+					engineDialog.value = null;
+				} finally {
+					engineSaving.value = false;
+				}
 			}
 			function createCategoryKey() {
 				const base = "user" + Date.now();
@@ -16044,12 +16554,12 @@
 					ref_key: "layerEl",
 					ref: layerEl,
 					style: normalizeStyle(layerStyle.value),
-					onClick: _cache[17] || (_cache[17] = withModifiers(() => {}, ["stop"]))
+					onClick: _cache[16] || (_cache[16] = withModifiers(() => {}, ["stop"]))
 				}, [
 					createBaseVNode("div", {
 						class: "sej-panel-header",
 						onMousedown: startDrag
-					}, [_cache[18] || (_cache[18] = createBaseVNode("span", { class: "sej-panel-title" }, "搜索跳转设置", -1)), createBaseVNode("button", {
+					}, [_cache[17] || (_cache[17] = createBaseVNode("span", { class: "sej-panel-title" }, "搜索跳转设置", -1)), createBaseVNode("button", {
 						type: "button",
 						class: "sej-panel-close",
 						title: "关闭",
@@ -16127,7 +16637,7 @@
 									"data-iqxingbk": engine.gbk ? "true" : null
 								}, [createBaseVNode("img", {
 									class: "sej-engine-icon",
-									src: engine.favicon,
+									src: unref(getFaviconSrc)(engine),
 									alt: ""
 								}, null, 8, _hoisted_14), createBaseVNode("span", null, toDisplayString(engine.name), 1)], 8, _hoisted_13),
 								createBaseVNode("span", {
@@ -16167,44 +16677,44 @@
 						"aria-label": "添加列表",
 						onClick: addCategory,
 						onKeydown: [withKeys(addCategory, ["enter"]), withKeys(withModifiers(addCategory, ["prevent"]), ["space"])]
-					}, [..._cache[19] || (_cache[19] = [createBaseVNode("span", { class: "sej-add-category-plus" }, "+", -1)])], 40, _hoisted_21)]),
+					}, [..._cache[18] || (_cache[18] = [createBaseVNode("span", { class: "sej-add-category-plus" }, "+", -1)])], 40, _hoisted_21)]),
 					createBaseVNode("div", _hoisted_22, [createBaseVNode("div", _hoisted_23, [
-						_cache[31] || (_cache[31] = createStaticVNode("<div class=\"sej-footer-links\"><span class=\"feedback\" title=\"在 GreasyFork 进行反馈\"><a target=\"_blank\" href=\"https://greasyfork.org/en/scripts/454280-searchenginejumpplus\">Greasy Fork</a></span><span class=\"feedback\" title=\"在 Github 进行反馈\"><a target=\"_blank\" href=\"https://github.com/MUTED64/SearchEngineJumpPlus\">GitHub</a></span></div>", 1)),
+						_cache[30] || (_cache[30] = createStaticVNode("<div class=\"sej-footer-links\"><span class=\"feedback\" title=\"在 GreasyFork 进行反馈\"><a target=\"_blank\" href=\"https://greasyfork.org/en/scripts/454280-searchenginejumpplus\">Greasy Fork</a></span><span class=\"feedback\" title=\"在 Github 进行反馈\"><a target=\"_blank\" href=\"https://github.com/MUTED64/SearchEngineJumpPlus\">GitHub</a></span></div>", 1)),
 						createBaseVNode("div", _hoisted_24, [
 							createBaseVNode("span", {
 								id: "xin-modification",
 								title: "配置文件",
 								onClick: openConfig
 							}, " 配置文件 "),
-							createBaseVNode("span", _hoisted_25, [createBaseVNode("label", null, [_cache[20] || (_cache[20] = createTextVNode("一键搜索", -1)), withDirectives(createBaseVNode("input", {
+							createBaseVNode("span", _hoisted_25, [createBaseVNode("label", null, [_cache[19] || (_cache[19] = createTextVNode("一键搜索", -1)), withDirectives(createBaseVNode("input", {
 								type: "checkbox",
 								"onUpdate:modelValue": _cache[5] || (_cache[5] = ($event) => draft.allOpen = $event)
 							}, null, 512), [[vModelCheckbox, draft.allOpen]])])]),
-							createBaseVNode("span", _hoisted_26, [createBaseVNode("label", null, [_cache[21] || (_cache[21] = createTextVNode("划词搜索", -1)), withDirectives(createBaseVNode("input", {
+							createBaseVNode("span", _hoisted_26, [createBaseVNode("label", null, [_cache[20] || (_cache[20] = createTextVNode("划词搜索", -1)), withDirectives(createBaseVNode("input", {
 								type: "checkbox",
 								"onUpdate:modelValue": _cache[6] || (_cache[6] = ($event) => draft.selectSearch = $event)
 							}, null, 512), [[vModelCheckbox, draft.selectSearch]])])]),
-							createBaseVNode("span", _hoisted_27, [createBaseVNode("label", null, [_cache[22] || (_cache[22] = createTextVNode("动画", -1)), withDirectives(createBaseVNode("input", {
+							createBaseVNode("span", _hoisted_27, [createBaseVNode("label", null, [_cache[21] || (_cache[21] = createTextVNode("动画", -1)), withDirectives(createBaseVNode("input", {
 								type: "checkbox",
 								"onUpdate:modelValue": _cache[7] || (_cache[7] = ($event) => draft.transtion = $event)
 							}, null, 512), [[vModelCheckbox, draft.transtion]])])]),
-							createBaseVNode("span", _hoisted_28, [createBaseVNode("label", null, [_cache[23] || (_cache[23] = createTextVNode("折叠当前搜索分类", -1)), withDirectives(createBaseVNode("input", {
+							createBaseVNode("span", _hoisted_28, [createBaseVNode("label", null, [_cache[22] || (_cache[22] = createTextVNode("折叠当前搜索分类", -1)), withDirectives(createBaseVNode("input", {
 								type: "checkbox",
 								"onUpdate:modelValue": _cache[8] || (_cache[8] = ($event) => draft.foldlist = $event)
 							}, null, 512), [[vModelCheckbox, draft.foldlist]])])]),
-							createBaseVNode("span", _hoisted_29, [createBaseVNode("label", null, [_cache[24] || (_cache[24] = createTextVNode("固定到顶端", -1)), withDirectives(createBaseVNode("input", {
+							createBaseVNode("span", _hoisted_29, [createBaseVNode("label", null, [_cache[23] || (_cache[23] = createTextVNode("固定到顶端", -1)), withDirectives(createBaseVNode("input", {
 								type: "checkbox",
 								"onUpdate:modelValue": _cache[9] || (_cache[9] = ($event) => draft.fixedTop = $event)
 							}, null, 512), [[vModelCheckbox, draft.fixedTop]])])]),
-							createBaseVNode("span", _hoisted_30, [createBaseVNode("label", null, [_cache[25] || (_cache[25] = createTextVNode("仅上拉显示", -1)), withDirectives(createBaseVNode("input", {
+							createBaseVNode("span", _hoisted_30, [createBaseVNode("label", null, [_cache[24] || (_cache[24] = createTextVNode("仅上拉显示", -1)), withDirectives(createBaseVNode("input", {
 								type: "checkbox",
 								"onUpdate:modelValue": _cache[10] || (_cache[10] = ($event) => draft.fixedTopUpward = $event)
 							}, null, 512), [[vModelCheckbox, draft.fixedTopUpward]])])]),
-							createBaseVNode("span", _hoisted_31, [createBaseVNode("label", null, [_cache[26] || (_cache[26] = createTextVNode("隐藏同站链接", -1)), withDirectives(createBaseVNode("input", {
+							createBaseVNode("span", _hoisted_31, [createBaseVNode("label", null, [_cache[25] || (_cache[25] = createTextVNode("隐藏同站链接", -1)), withDirectives(createBaseVNode("input", {
 								type: "checkbox",
 								"onUpdate:modelValue": _cache[11] || (_cache[11] = ($event) => draft.HideTheSameLink = $event)
 							}, null, 512), [[vModelCheckbox, draft.HideTheSameLink]])])]),
-							createBaseVNode("span", _hoisted_32, [_cache[28] || (_cache[28] = createTextVNode(" 居中： ", -1)), withDirectives(createBaseVNode("select", { "onUpdate:modelValue": _cache[12] || (_cache[12] = ($event) => draft.center = $event) }, [..._cache[27] || (_cache[27] = [
+							createBaseVNode("span", _hoisted_32, [_cache[27] || (_cache[27] = createTextVNode(" 居中： ", -1)), withDirectives(createBaseVNode("select", { "onUpdate:modelValue": _cache[12] || (_cache[12] = ($event) => draft.center = $event) }, [..._cache[26] || (_cache[26] = [
 								createBaseVNode("option", { value: 0 }, "默认", -1),
 								createBaseVNode("option", { value: 1 }, "强制", -1),
 								createBaseVNode("option", { value: 2 }, "自动", -1)
@@ -16214,34 +16724,40 @@
 								void 0,
 								{ number: true }
 							]])]),
-							createBaseVNode("span", _hoisted_33, [_cache[30] || (_cache[30] = createTextVNode(" 打开方式： ", -1)), withDirectives(createBaseVNode("select", { "onUpdate:modelValue": _cache[13] || (_cache[13] = ($event) => draft.newtab = $event) }, [..._cache[29] || (_cache[29] = [createBaseVNode("option", { value: 0 }, "默认页面", -1), createBaseVNode("option", { value: 1 }, "新标签页", -1)])], 512), [[
+							createBaseVNode("span", _hoisted_33, [_cache[29] || (_cache[29] = createTextVNode(" 打开方式： ", -1)), withDirectives(createBaseVNode("select", { "onUpdate:modelValue": _cache[13] || (_cache[13] = ($event) => draft.newtab = $event) }, [..._cache[28] || (_cache[28] = [createBaseVNode("option", { value: 0 }, "默认页面", -1), createBaseVNode("option", { value: 1 }, "新标签页", -1)])], 512), [[
 								vModelSelect,
 								draft.newtab,
 								void 0,
 								{ number: true }
 							]])])
 						]),
-						createBaseVNode("div", { class: "sej-footer-actions" }, [createBaseVNode("span", {
+						createBaseVNode("div", _hoisted_34, [createBaseVNode("span", {
 							id: "xin-save",
 							title: "save & close",
+							class: normalizeClass({ "sej-saving": saving.value }),
 							onClick: save
-						}, "保存并关闭")])
+						}, toDisplayString(saving.value ? "处理图标中…" : "保存并关闭"), 3)])
 					])]),
 					engineDialog.value ? (openBlock(), createBlock(_sfc_main$4, {
 						key: 0,
 						mode: engineDialog.value.mode,
 						initial: engineDialog.value.initial,
+						busy: engineSaving.value,
 						"resolve-icon": getICON,
 						onSubmit: submitEngine,
-						onCancel: _cache[14] || (_cache[14] = ($event) => engineDialog.value = null)
-					}, null, 8, ["mode", "initial"])) : createCommentVNode("", true),
+						onCancel: cancelEngineDialog
+					}, null, 8, [
+						"mode",
+						"initial",
+						"busy"
+					])) : createCommentVNode("", true),
 					configOpen.value ? (openBlock(), createBlock(_sfc_main$3, {
 						key: 1,
 						"initial-text": configText.value,
 						onSave: saveConfig,
 						onReset: reset,
-						onClose: _cache[15] || (_cache[15] = ($event) => configOpen.value = false),
-						onCopy: _cache[16] || (_cache[16] = ($event) => unref(showToast)("复制成功"))
+						onClose: _cache[14] || (_cache[14] = ($event) => configOpen.value = false),
+						onCopy: _cache[15] || (_cache[15] = ($event) => unref(showToast)("复制成功"))
 					}, null, 8, ["initial-text"])) : createCommentVNode("", true)
 				], 4)], 36);
 			};
@@ -16276,7 +16792,7 @@
 			};
 		}
 	};
-	var global_default = "/* ==UserStyle==\n@name           SearchEngineJumpPlusGlobalStyle\n@description    Global style for SearchEngineJumpPlus\n@version        5.32.0\n@namespace      https://greasyfork.org/en/scripts/454280-searchenginejumpplus\n@license        MIT\n@author         MUTED64\n==/UserStyle== */\n\n#settingLayerMask {\n  display: none;\n  justify-content: center;\n  align-items: center;\n  position: fixed;\n  inset: 0;\n  background-color: rgba(16, 18, 22, 0.42);\n  backdrop-filter: blur(12px);\n  z-index: 200000000;\n  overflow: auto;\n  font-family: var(--sej-font-family);\n  min-height: 100%;\n  font-size: 14px;\n  transition: opacity 0.15s ease-out;\n  opacity: 0;\n  animation: sej-setting-mask-in 0.15s ease;\n  user-select: none;\n  -moz-user-select: none;\n  padding-bottom: 80px;\n  box-sizing: border-box;\n  color: var(--font-color-qxin);\n}\n#settingLayer {\n  display: flex;\n  flex-direction: column;\n  box-sizing: border-box;\n  --sej-panel-pad-x: 20px;\n  --sej-panel-pad-top: 16px;\n  padding: var(--sej-panel-pad-top) var(--sej-panel-pad-x) 16px;\n  background-color: var(--background-setting-qxin);\n  border: 1px solid var(--border-color-sej);\n  border-radius: 16px;\n  box-shadow: var(--sej-panel-shadow);\n  position: absolute;\n  width: auto;\n  min-width: min(720px, calc(100vw - 32px));\n  max-width: min(960px, calc(100vw - 32px));\n  max-height: calc(100vh - 48px);\n  margin: 0;\n  overflow: visible;\n  animation: sej-panel-in 0.16s ease-out;\n}\n@keyframes sej-panel-in {\n  from {\n    opacity: 0;\n    transform: translateY(6px) scale(0.99);\n  }\n}\n.sej-panel-header {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n  flex: 0 0 auto;\n  padding: 0 2px 12px;\n  cursor: move;\n}\n.sej-panel-title {\n  font-size: 15px;\n  font-weight: 600;\n  letter-spacing: 0.01em;\n}\n.sej-panel-close {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  width: 28px;\n  height: 28px;\n  padding: 0;\n  border: none;\n  border-radius: 8px;\n  background: transparent;\n  color: inherit;\n  font-size: 15px;\n  line-height: 1;\n  cursor: pointer;\n  opacity: 0.55;\n  transition: background-color 0.12s ease-out, opacity 0.12s ease-out;\n}\n.sej-panel-close:hover {\n  opacity: 1;\n  background: var(--sej-surface-hover);\n}\n.iqxin-items {\n  display: flex;\n  flex-direction: column;\n  flex: 0 0 220px;\n  width: 220px;\n  min-width: 0;\n  max-width: 220px;\n  box-sizing: border-box;\n  margin: 0;\n  padding: 6px;\n  border-radius: 12px;\n  border: 1px solid var(--border-color-sej);\n  background: var(--sej-surface-2);\n}\n.sej-add-category-card {\n  align-items: center;\n  justify-content: center;\n  min-height: 140px;\n  background: transparent;\n  border: 1px dashed var(--sej-checkbox-border);\n  color: var(--font-color-qxin);\n  cursor: pointer;\n  transition: background-color 0.12s ease-out, border-color 0.12s ease-out,\n    color 0.12s ease-out;\n}\n.sej-add-category-card:hover {\n  background: var(--sej-surface-hover);\n  border-color: var(--sej-accent);\n  color: var(--sej-accent);\n}\n.sej-add-category-card:focus-visible {\n  background: var(--sej-surface-hover);\n  outline: 2px solid var(--sej-accent);\n  outline-offset: 2px;\n}\n.sej-add-category-plus {\n  font-size: 42px;\n  font-weight: 300;\n  line-height: 1;\n  opacity: 0.45;\n  transition: opacity 0.12s ease-out;\n}\n.sej-add-category-card:hover .sej-add-category-plus {\n  opacity: 1;\n}\n.sejcon {\n  display: flex;\n  flex-direction: column;\n  flex: 1 1 auto;\n}\n.sejcon > .drag {\n  flex: 0 0 auto;\n}\n#settingLayer .drag {\n  display: block;\n  position: relative;\n}\n#settingLayer .sej-engine {\n  padding: 0 82px 0 8px;\n  width: 100%;\n  height: 30px;\n  box-sizing: border-box;\n  border-radius: 8px;\n  font-size: 13px;\n  cursor: default;\n}\n#settingLayer .sej-engine > span {\n  flex: 0 1 auto;\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n.iqxin-pointer-events,\n.sej-engine-icon,\n#settingLayer .sej-engine * {\n  pointer-events: none;\n}\n.sejtitle {\n  text-align: left;\n  padding: 5px 82px 5px 8px;\n  margin-bottom: 2px;\n  overflow: hidden;\n  white-space: nowrap;\n  text-overflow: ellipsis;\n  cursor: default;\n  position: relative;\n  font-size: 13px;\n  font-weight: 600;\n  line-height: 1.5;\n  border-radius: 8px;\n  transition: background-color 0.12s ease-out;\n}\n#settingLayerMask [data-xin] {\n  margin: 1px 0;\n  border-radius: 8px;\n}\n#settingLayerMask .iqxin-set-edit,\n#settingLayerMask .iqxin-set-del,\n#settingLayerMask .iqxin-title-edit,\n#settingLayerMask .iqxin-set-title-del {\n  border-radius: 6px;\n  line-height: 1em;\n  margin-right: 2px;\n}\n.sejcon [data-xin] {\n  cursor: pointer;\n}\n#settingLayerMask [data-iqxindisabled=\"true\"],\n[data-xin^=\"-\"] {\n  background-color: var(--sej-danger-weak);\n  text-decoration: line-through !important;\n  text-decoration-color: var(--sej-danger) !important;\n  transition: background-color 0.12s ease-out;\n}\n.sejtitle:not([data-xin^=\"-\"]):hover {\n  background: var(--sej-surface-hover);\n}\n#settingLayerMask .sej-engine:hover {\n  background-color: var(--sej-surface-hover);\n}\n#settingLayerMask [data-iqxindisabled=\"true\"]:hover,\n[data-xin^=\"-\"]:hover {\n  background-color: var(--sej-danger-weak);\n}\n#settingLayerMask label {\n  cursor: pointer;\n}\n#settingLayerMask .sej-engine-icon {\n  vertical-align: middle;\n}\n#btnEle {\n  position: relative;\n  width: 100%;\n  background: transparent;\n  border-radius: 0;\n  flex: 0 0 auto;\n}\n#btnEle {\n  margin-top: 10px;\n}\n#btnEle span {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  gap: 6px;\n  background: var(--sej-btn-bg);\n  border: 1px solid var(--border-color-sej);\n  margin: 0;\n  color: var(--font-color-qxin);\n  padding: 6px 12px;\n  border-radius: 8px;\n  font-size: 13px;\n  line-height: 1.35;\n  cursor: pointer;\n  outline: none;\n  transition: background-color 0.12s ease-out, border-color 0.12s ease-out,\n    color 0.12s ease-out, opacity 0.12s ease-out;\n}\n#btnEle label {\n  display: inline-flex;\n  align-items: center;\n  gap: 6px;\n  color: inherit;\n}\n#btnEle span:hover {\n  background: var(--sej-surface-hover);\n  color: var(--font-color-qxin);\n}\n#btnEle a {\n  color: var(--font-color-qxin);\n  opacity: 0.7;\n  text-decoration: none;\n  font-family: inherit;\n  transition: opacity 0.12s ease-out, color 0.12s ease-out;\n}\n#btnEle a:hover {\n  opacity: 1;\n  color: var(--sej-accent);\n}\n#btnEle .feedback {\n  background: transparent;\n  border-color: transparent;\n  padding: 6px 6px;\n}\n#btnEle .feedback:hover {\n  background: transparent;\n  border-color: transparent;\n}\n#btnEle > div {\n  width: 100%;\n  display: flex;\n  flex-wrap: wrap;\n  justify-content: flex-start;\n  align-items: center;\n  gap: 8px;\n  box-sizing: border-box;\n}\n#btnEle > div {\n  background: transparent;\n  border-radius: 0;\n  border-top: 1px solid var(--border-color-sej);\n  padding-top: 14px;\n  gap: 10px 12px;\n}\n.sej-footer-links,\n.sej-footer-options,\n.sej-footer-actions {\n  display: flex;\n  align-items: center;\n  flex-wrap: wrap;\n  gap: 8px;\n  min-width: 0;\n}\n.sej-footer-options {\n  order: 1;\n  flex: 1 1 100%;\n}\n.sej-footer-links {\n  order: 2;\n}\n.sej-footer-actions {\n  order: 3;\n  margin-left: auto;\n}\n#btnEle #xin-save {\n  background: var(--sej-accent);\n  border-color: transparent;\n  color: var(--sej-accent-contrast);\n  font-weight: 600;\n}\n#btnEle #xin-save:hover {\n  background: var(--sej-accent);\n  color: var(--sej-accent-contrast);\n  opacity: 0.85;\n}\n#btnEle span.iqxin-btn-active {\n  background: var(--sej-accent-weak);\n  border-color: var(--sej-accent);\n  color: var(--sej-accent);\n}\n#settingLayerMask input[type=\"checkbox\"] {\n  appearance: none;\n  -webkit-appearance: none;\n  width: 16px;\n  height: 16px;\n  display: inline-block;\n  box-sizing: border-box;\n  vertical-align: -3px;\n  margin: 0 !important;\n  padding: 0;\n  position: relative;\n  border: 1.5px solid var(--sej-checkbox-border);\n  border-radius: 5px;\n  background: var(--sej-input-bg);\n  cursor: pointer;\n  transition: background-color 0.12s ease-out, border-color 0.12s ease-out;\n}\n#settingLayerMask input[type=\"checkbox\"]:before {\n  content: none;\n}\n#settingLayerMask input[type=\"checkbox\"]:checked {\n  background: var(--sej-accent);\n  border-color: var(--sej-accent);\n}\n#settingLayerMask input[type=\"checkbox\"]:checked:after {\n  content: \"\";\n  position: absolute;\n  left: 4px;\n  top: 1px;\n  width: 4px;\n  height: 8px;\n  border: solid var(--sej-accent-contrast);\n  border-width: 0 2px 2px 0;\n  background: none;\n  transform: rotate(45deg);\n}\n.drop-over {\n  opacity: 0.6;\n}\n.iqxin-title-edit,\n.iqxin-set-edit,\n.iqxin-set-title-del,\n.iqxin-set-del,\n.iqxin-set-toggle {\n  visibility: visible;\n  opacity: 0.6;\n  position: absolute;\n  background: transparent;\n  top: 50%;\n  transform: translate(0, -50%);\n  padding: 3px;\n  border-radius: 6px;\n  cursor: pointer;\n  transition: opacity 0.12s ease-out, background-color 0.12s ease-out,\n    color 0.12s ease-out;\n}\n.iqxin-title-edit,\n.iqxin-set-edit {\n  right: 30px;\n}\n.iqxin-set-title-del,\n.iqxin-set-del {\n  right: 2px;\n}\n.iqxin-set-toggle {\n  right: 58px;\n  display: inline-flex;\n  align-items: center;\n  color: var(--font-color-qxin);\n}\n.iqxin-set-toggle svg {\n  display: block;\n}\n.iqxin-set-toggle.iqxin-set-hidden {\n  opacity: 0.35;\n}\n.iqxin-title-edit:hover,\n.iqxin-set-edit:hover,\n.iqxin-set-title-del:hover,\n.iqxin-set-del:hover,\n.iqxin-set-toggle:hover {\n  opacity: 1;\n  background: var(--sej-surface-hover);\n}\nspan.iqxin-additem {\n  display: inline-block;\n  text-align: center;\n  width: 100%;\n  box-sizing: border-box;\n  margin: auto 0 2px;\n  padding: 5px 0;\n  border: 1px dashed var(--sej-checkbox-border);\n  border-radius: 8px;\n  color: var(--font-color-qxin);\n  opacity: 0.55;\n  cursor: pointer;\n  visibility: visible;\n  transition: opacity 0.12s ease-out, border-color 0.12s ease-out,\n    color 0.12s ease-out;\n}\nspan.iqxin-additem:hover {\n  opacity: 1;\n  border-color: var(--sej-accent);\n  color: var(--sej-accent);\n}\n#newSearchListBox,\n#newSearchBox {\n  position: fixed;\n  z-index: 200000100;\n  top: 50%;\n  left: 50%;\n  transform: translate(-50%, -50%);\n  width: min(400px, calc(100vw - 32px));\n  box-sizing: border-box;\n  padding: 20px;\n  background: var(--background-setting-qxin);\n  border: 1px solid var(--border-color-sej);\n  border-radius: 14px;\n  box-shadow: var(--sej-shadow-menu);\n  color: var(--font-color-qxin);\n  margin: 0;\n  transition: opacity 0.14s ease-out, transform 0.14s ease-out;\n}\n.sej-dialog-title {\n  font-size: 15px;\n  font-weight: 600;\n  margin-bottom: 16px;\n}\n.sej-field {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  margin-bottom: 12px;\n  font-size: 12px;\n}\n.sej-field > span {\n  opacity: 0.65;\n}\n.sej-field-inline {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  font-size: 13px;\n  cursor: pointer;\n}\n.sej-dialog-actions {\n  display: flex;\n  justify-content: flex-end;\n  gap: 8px;\n  margin-top: 16px;\n}\n#newSearchListBox input,\n#newSearchBox input {\n  width: 100%;\n  box-sizing: border-box;\n  border: 1px solid var(--border-color-sej);\n  padding: 7px 9px;\n  border-radius: 8px;\n  outline: none;\n  color: var(--font-color-qxin);\n  background: var(--sej-input-bg);\n  font-family: inherit;\n  font-size: 13px;\n  transition: border-color 0.12s ease-out, box-shadow 0.12s ease-out;\n}\n#newSearchBox #iqxin-newTarget {\n  width: 100%;\n  border-radius: 8px;\n  border: 1px solid var(--border-color-sej);\n  padding: 7px 9px;\n  background: var(--sej-input-bg);\n  color: var(--font-color-qxin);\n  font-family: inherit;\n  font-size: 13px;\n  outline: none;\n}\n.iqxin-help-link {\n  color: var(--font-color-qxin);\n  opacity: 0.6;\n}\n#newSearchListBox input:focus,\n#newSearchBox input:focus {\n  background: var(--sej-input-bg);\n  border-color: var(--sej-accent);\n  box-shadow: 0 0 0 3px var(--sej-focus-ring);\n}\n.addItemBoxBtn {\n  cursor: pointer;\n  background: var(--sej-btn-bg);\n  border: 1px solid var(--border-color-sej);\n  border-radius: 8px;\n  padding: 6px 14px;\n  color: var(--font-color-qxin);\n  font-family: inherit;\n  font-size: 13px;\n  transition: background-color 0.12s ease-out, border-color 0.12s ease-out,\n    color 0.12s ease-out;\n}\n.addItemBoxBtn:hover {\n  background: var(--sej-surface-hover);\n}\n#xin-centerDisplay select,\n#xin-newtab select {\n  height: auto;\n  border: 1px solid var(--border-color-sej);\n  outline: none;\n  color: var(--font-color-qxin);\n  font-size: 13px;\n  font-family: inherit;\n  padding: 3px 6px;\n  border-radius: 6px;\n  cursor: pointer;\n  text-decoration: none;\n  background: var(--sej-input-bg);\n  transition: border-color 0.12s ease-out;\n}\n#xin-centerDisplay select:focus,\n#xin-newtab select:focus {\n  border-color: var(--sej-accent);\n}\n#xin-centerDisplay select option,\n#xin-newtab select option {\n  background: var(--sej-input-bg);\n  color: var(--font-color-qxin);\n}\n#titleEdit {\n  width: 8em;\n  box-sizing: border-box;\n  border: 1px solid var(--sej-accent);\n  border-radius: 6px;\n  padding: 2px 6px;\n  background: var(--sej-input-bg);\n  color: var(--font-color-qxin);\n  font-family: inherit;\n  font-size: 13px;\n  outline: none;\n}\n.iqxin-closeBtn,\n.iqxin-enterBtn {\n  box-sizing: border-box;\n}\n.iqxin-enterBtn {\n  background: var(--sej-accent);\n  border-color: transparent;\n  color: var(--sej-accent-contrast);\n  font-weight: 600;\n}\n.iqxin-enterBtn:hover {\n  background: var(--sej-accent);\n  border-color: transparent;\n  color: var(--sej-accent-contrast);\n  opacity: 0.85;\n}\n.iqxin-closeBtn:hover {\n  background: var(--sej-danger-weak);\n  border-color: var(--sej-danger);\n  color: var(--sej-danger);\n}\n#iqxin-editCodeBox {\n  position: fixed;\n  top: 50%;\n  left: 50%;\n  transform: translate(-50%, -50%);\n  z-index: 200000100;\n  width: min(560px, calc(100vw - 32px));\n  max-height: calc(100vh - 48px);\n  box-sizing: border-box;\n  display: flex;\n  flex-direction: column;\n  gap: 10px;\n  padding: 20px;\n  background: var(--background-setting-qxin);\n  border: 1px solid var(--border-color-sej);\n  border-radius: 14px;\n  box-shadow: var(--sej-shadow-menu);\n  color: var(--font-color-qxin);\n}\n#iqxin-editCodeBox p {\n  margin: 0;\n}\n#iqxin-editCodeBox button {\n  cursor: pointer;\n  background: var(--sej-btn-bg);\n  border: 1px solid var(--border-color-sej);\n  border-radius: 8px;\n  padding: 6px 14px;\n  color: var(--font-color-qxin);\n  font-family: inherit;\n  font-size: 13px;\n  transition: background-color 0.12s ease-out, border-color 0.12s ease-out,\n    color 0.12s ease-out;\n}\n#iqxin-editCodeBox button:hover {\n  background: var(--sej-surface-hover);\n}\n#iqxin-editCodeBox .iqxin-enterBtn {\n  background: var(--sej-accent);\n  border-color: transparent;\n  color: var(--sej-accent-contrast);\n}\n#iqxin-editCodeBox .iqxin-closeBtn:hover {\n  background: var(--sej-danger-weak);\n  border-color: var(--sej-danger);\n  color: var(--sej-danger);\n}\n#iqxin-editCodeBox textarea {\n  width: 100%;\n  box-sizing: border-box;\n  flex: 1 1 auto;\n  min-height: 240px;\n  padding: 10px;\n  overflow: auto;\n  border: 1px solid var(--border-color-sej);\n  border-radius: 10px;\n  background: var(--sej-input-bg);\n  color: var(--font-color-qxin);\n  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n  font-size: 12px;\n  line-height: 1.5;\n  resize: vertical;\n  outline: none;\n}\n#iqxin-editCodeBox textarea:focus {\n  border-color: var(--sej-accent);\n  box-shadow: 0 0 0 3px var(--sej-focus-ring);\n}\n.iqxin-warning {\n  color: var(--sej-danger);\n  font-size: 14px;\n  font-weight: 600;\n}\n#importingBox {\n  position: fixed;\n  width: min(350px, calc(100vw - 32px));\n  top: 50%;\n  left: 50%;\n  transform: translate(-50%, -50%);\n  padding: 16px 24px;\n  border: 1px solid var(--border-color-sej);\n  border-radius: 12px;\n  background: var(--background-setting-qxin);\n  color: var(--font-color-qxin);\n}\n#importingBox li {\n  margin: 5px;\n  border-bottom: 1px solid var(--border-color-sej);\n}\n#importingBox li p {\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  margin-top: 0;\n  margin-bottom: 0;\n}\n.xin-importing-item {\n  cursor: pointer;\n}\n#setBtn {\n  transition: background-color 0.08s ease-out, opacity 0.08s ease-out;\n  width: 30px;\n  height: 30px;\n  flex: 0 0 auto;\n  padding: 0;\n  border-radius: 8px;\n  align-items: center;\n  justify-content: center;\n  cursor: pointer;\n  display: flex;\n  opacity: 0.65;\n}\nspan#setBtn:hover {\n  opacity: 1;\n  background-color: var(--sej-hover-bg, var(--background-hover-color-qxin));\n}\nspan#setBtn:active {\n  background-color: var(--sej-active-bg, rgba(0, 0, 0, 0.1));\n}\n#sej-container {\n  display: flex;\n  align-items: center;\n  position: relative;\n  z-index: 2;\n  padding: 2px;\n  gap: 2px;\n  font-size: 13px;\n  font-family: var(--sej-font-family);\n  -webkit-font-smoothing: antialiased;\n  transform-origin: top center;\n  animation: sejopen 0.14s ease-out;\n  color: var(--font-color-qxin);\n  background: var(--sej-bar-bg, var(--background-color-qxin));\n  backdrop-filter: blur(20px) saturate(180%);\n  width: max-content !important;\n  max-width: 100%;\n  box-sizing: border-box;\n  border-radius: var(--sej-radius-bar, 12px);\n  border: 1px solid var(--border-color-sej);\n  overflow: auto;\n  box-shadow: var(\n    --sej-shadow-bar,\n    0 1px 2px hsla(0, 0%, 0%, 0.06),\n    0 8px 24px -12px hsla(0, 0%, 0%, 0.35)\n  );\n  height: fit-content;\n  flex-wrap: wrap;\n  justify-content: center;\n  user-select: none;\n}\n/* 给用户的提示 */\n#iqixn-global-tip {\n  box-sizing: content-box !important;\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  opacity: 0;\n  height: 25px;\n  line-height: 25px;\n  letter-spacing: 1px;\n  font-size: 14px;\n  color: #fff;\n  padding: 5px 20px;\n  border-radius: 8px;\n  background-color: #666;\n  position: fixed;\n  z-index: 200000001;\n  left: 50%;\n  bottom: 5%;\n  transform: translate(-50%);\n  pointer-events: none;\n  transition: opacity 0.15s ease-out;\n}\n#iqixn-global-tip.sej-toast-visible {\n  pointer-events: auto;\n}\n#iqixn-global-tip .sej-toast-action {\n  pointer-events: auto;\n  border: none;\n  border-radius: 6px;\n  padding: 2px 10px;\n  background: rgba(255, 255, 255, 0.2);\n  color: #fff;\n  font: inherit;\n  letter-spacing: inherit;\n  line-height: 20px;\n  cursor: pointer;\n  transition: background-color 0.12s ease-out;\n}\n#iqixn-global-tip .sej-toast-action:hover {\n  background: rgba(255, 255, 255, 0.34);\n}\n/* 夜间模式 - 默认主题变量 */\n:root,\n:host,\nbody {\n  --font-color-qxin: #333;\n  --background-color-qxin: #fffffff0;\n  --background-avtive-color-qxin: #ccc;\n  --background-active-enable-qxin: #cff9ff;\n  --background-active-disable-qxin: #ffa2a2;\n  --background-hover-color-qxin: #eaeaea;\n  --trigger-shown-qxin: #f1f3f4 !important;\n  --background-btn-qxin: #eff4f8;\n  --background-setting-qxin: #fff;\n  --box-shadow-color-sej: hsla(0, 0%, 0%, 7%);\n  --border-color-sej: #e1e6ea;\n\n  /* 跳转条现代化外观 */\n  --sej-font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\",\n    \"PingFang SC\", \"Hiragino Sans GB\", \"Microsoft YaHei\", sans-serif;\n  --sej-bar-bg: rgba(255, 255, 255, 0.88);\n  --sej-hover-bg: rgba(0, 0, 0, 0.055);\n  --sej-active-bg: rgba(0, 0, 0, 0.1);\n  --sej-accent: #4285f4;\n  --sej-accent-weak: rgba(66, 133, 244, 0.12);\n  --sej-radius-bar: 12px;\n  --sej-radius-item: 8px;\n  --sej-radius-menu: 12px;\n  --sej-shadow-bar: 0 1px 2px hsla(0, 0%, 0%, 0.06),\n    0 8px 24px -12px hsla(0, 0%, 0%, 0.35);\n  --sej-shadow-menu: 0 2px 6px hsla(0, 0%, 0%, 0.06),\n    0 16px 40px -12px hsla(0, 0%, 0%, 0.3);\n\n  /* 设置面板 */\n  --sej-surface-2: rgba(0, 0, 0, 0.025);\n  --sej-surface-hover: rgba(0, 0, 0, 0.06);\n  --sej-input-bg: #fff;\n  --sej-btn-bg: #fff;\n  --sej-checkbox-border: #cfd5dd;\n  --sej-focus-ring: rgba(66, 133, 244, 0.22);\n  --sej-accent-contrast: #fff;\n  --sej-danger: #d93025;\n  --sej-danger-weak: rgba(217, 48, 37, 0.1);\n  --sej-panel-shadow: 0 24px 64px -24px hsla(0, 0%, 0%, 0.45),\n    0 2px 8px hsla(0, 0%, 0%, 0.06);\n}\n/* 暗黑模式变量 - 当主文档是暗黑模式时 */\n:root[qxintheme=\"dark\"],\n:host[qxintheme=\"dark\"],\nbody[qxintheme=\"dark\"] {\n  --font-color-qxin: #bdc1bc;\n  --background-color-qxin: #202124f0;\n  --background-avtive-color-qxin: #424242;\n  --background-active-enable-qxin: #274144;\n  --background-active-disable-qxin: #583535;\n  --background-hover-color-qxin: #424242;\n  --trigger-shown-qxin: #3c4043 !important;\n  --background-btn-qxin: #292f36;\n  --background-setting-qxin: #202124;\n  --box-shadow-color-sej: hsla(0, 0%, 70%, 10%);\n  --border-color-sej: #3b4547;\n\n  --sej-bar-bg: rgba(32, 33, 36, 0.9);\n  --sej-hover-bg: rgba(255, 255, 255, 0.09);\n  --sej-active-bg: rgba(255, 255, 255, 0.14);\n  --sej-accent: #8ab4f8;\n  --sej-accent-weak: rgba(138, 180, 248, 0.18);\n  --sej-shadow-bar: 0 1px 2px hsla(0, 0%, 0%, 0.5),\n    0 8px 24px -12px hsla(0, 0%, 0%, 0.8);\n  --sej-shadow-menu: 0 2px 6px hsla(0, 0%, 0%, 0.5),\n    0 16px 40px -12px hsla(0, 0%, 0%, 0.85);\n\n  --sej-surface-2: rgba(255, 255, 255, 0.045);\n  --sej-surface-hover: rgba(255, 255, 255, 0.09);\n  --sej-input-bg: #17181a;\n  --sej-btn-bg: rgba(255, 255, 255, 0.04);\n  --sej-checkbox-border: #4a5459;\n  --sej-focus-ring: rgba(138, 180, 248, 0.3);\n  --sej-accent-contrast: #202124;\n  --sej-danger: #f28b82;\n  --sej-danger-weak: rgba(242, 139, 130, 0.14);\n  --sej-panel-shadow: 0 24px 64px -20px hsla(0, 0%, 0%, 0.85),\n    0 2px 8px hsla(0, 0%, 0%, 0.5);\n}\n/* 滑词搜索样式 */\n#sej-container.selectSearch {\n  position: fixed;\n  top: 2px;\n  left: 0;\n  right: 0;\n  z-index: 99999999;\n  margin: 0 auto;\n  transform: translateY(calc(-100% - 10px));\n  visibility: hidden;\n  pointer-events: none;\n  transition: transform 0.3s, visibility 0s linear 0.3s;\n}\n#sej-container.selectSearch.sej-select-visible {\n  transform: none;\n  visibility: visible;\n  pointer-events: auto;\n  transition: transform 0.3s, visibility 0s linear 0s;\n}\n#sej-expanded-category {\n  font-weight: bold;\n}\n.sej-category {\n  display: inline-flex;\n  align-items: center;\n}\n.sej-category-title {\n  font-weight: 600;\n  padding: 0 12px;\n  opacity: 0.8;\n}\n.sej-engine {\n  padding: 0 13px;\n  transition: background-color 0.08s ease-out, opacity 0.08s ease-out;\n  font-size: 13px;\n  font-family: var(--sej-font-family);\n  display: inline-flex;\n  gap: 8px;\n  align-items: center;\n  height: 2.6em;\n  box-sizing: border-box;\n  text-decoration: none !important;\n  color: var(--font-color-qxin) !important;\n  cursor: pointer;\n  white-space: nowrap;\n}\n#sej-container > .sej-engine,\n#sej-container .sej-category > .sej-engine {\n  height: 30px;\n  padding: 0 11px;\n  gap: 6px;\n  border-radius: var(--sej-radius-item, 8px);\n  font-weight: 500;\n}\n.sej-drop-list a:visited,\n.sej-drop-list a:hover,\n.sej-engine a:visited,\n.sej-engine a:hover,\n#sej-container a:link,\n#sej-container a:visited,\n#sej-container a:hover {\n  color: var(--font-color-qxin);\n}\n.sej-engine:hover {\n  background-color: var(--sej-hover-bg, var(--background-hover-color-qxin));\n}\n.sej-engine:active {\n  background-color: var(--sej-active-bg, rgba(0, 0, 0, 0.1));\n}\n#sej-container .sej-engine:focus-visible {\n  outline: 2px solid var(--sej-accent, #4285f4);\n  outline-offset: -2px;\n}\n.sej-engine.sej-drop-list-trigger-shown {\n  background-color: var(--trigger-shown-qxin);\n}\n.sej-drop-list > .sej-engine {\n  display: flex;\n  justify-content: flex-start;\n  width: 100%;\n  height: 40px;\n  padding: 0 12px;\n  gap: 10px;\n  border-radius: var(--sej-radius-item, 8px);\n  font-weight: 400;\n}\n.sej-drop-list > .sej-engine + .sej-engine {\n  margin-top: 1px;\n}\n\n.sej-engine-icon {\n  width: 16px;\n  height: 16px;\n  flex: 0 0 auto;\n  object-fit: cover;\n  display: inline-block;\n  margin: 0;\n}\n.sej-engine-icon:not([src]) {\n  display: none;\n}\n\n.sej-drop-list {\n  /* 使用 fixed 定位确保在 Shadow DOM 中位置正确 */\n  position: fixed;\n  display: none;\n  opacity: 0.2;\n  top: -10000px;\n  left: 0;\n  min-width: 128px;\n  padding: 6px;\n  box-sizing: border-box;\n  text-align: left;\n  font-size: 13px;\n  font-family: var(--sej-font-family);\n  -webkit-font-smoothing: antialiased;\n  box-shadow: var(\n    --sej-shadow-menu,\n    0 2px 6px hsla(0, 0%, 0%, 0.06),\n    0 16px 40px -12px hsla(0, 0%, 0%, 0.3)\n  );\n  background-color: var(--sej-bar-bg, var(--background-color-qxin));\n  backdrop-filter: blur(20px) saturate(180%);\n  transition: opacity 0.08s ease-out;\n  animation: sej-drop-menu-in 0.1s ease-out;\n  overflow: hidden;\n  border-radius: var(--sej-radius-menu, 12px);\n  border: 1px solid var(--border-color-sej);\n  user-select: none;\n}\n@keyframes sej-drop-menu-in {\n  from {\n    opacity: 0;\n    transform: translateY(-4px) scale(0.98);\n  }\n}\n@keyframes sej-setting-mask-in {\n  from {\n    opacity: 0;\n  }\n}\n@keyframes sejopen {\n  0% {\n    transform: translateY(-4px) scale(0.98);\n    opacity: 0;\n  }\n  100% {\n    transform: none;\n    opacity: 1;\n  }\n}\n@keyframes iqxinsejopen {\n  0% {\n    transform: scale(0.01, 0.01);\n    opacity: 0;\n  }\n  100% {\n    transform: scale(1, 1);\n    opacity: 1;\n  }\n}\n\n/* ---------- Vue 重构版设置面板布局优化 ---------- */\n#settingLayerMask {\n  padding: 20px;\n  box-sizing: border-box;\n}\n\n#sej-settings-body {\n  display: flex;\n  flex: 1 1 auto;\n  flex-wrap: wrap;\n  align-content: flex-start;\n  gap: 10px;\n  min-height: 0;\n  overflow-y: auto;\n  overflow-x: hidden;\n  /* 让滚动条贴住面板内边缘，而不是停在内容区的内边距处 */\n  margin-top: 0;\n  margin-right: calc(var(--sej-panel-pad-x) * -1);\n  padding-top: 2px;\n  padding-right: var(--sej-panel-pad-x);\n  padding-bottom: 4px;\n}\n#sej-settings-body::-webkit-scrollbar {\n  width: 8px;\n}\n#sej-settings-body::-webkit-scrollbar-thumb {\n  background: var(--sej-surface-hover);\n  border-radius: 4px;\n}\n#settingLayer #btnEle {\n  flex: 0 0 auto;\n}\n\n@media (max-width: 780px) {\n  #btnEle span {\n    font-size: 12px;\n    padding: 5px 8px;\n  }\n  #settingLayer {\n    --sej-panel-pad-x: 12px;\n    min-width: calc(100vw - 16px);\n    max-width: calc(100vw - 16px);\n    max-height: calc(100vh - 16px);\n  }\n}\n\n@media (max-width: 560px) {\n  .iqxin-items {\n    flex: 1 1 160px;\n    width: auto;\n    max-width: none;\n  }\n}\n";
+	var global_default = "/* ==UserStyle==\n@name           SearchEngineJumpPlusGlobalStyle\n@description    Global style for SearchEngineJumpPlus\n@version        5.32.0\n@namespace      https://greasyfork.org/en/scripts/454280-searchenginejumpplus\n@license        MIT\n@author         MUTED64\n==/UserStyle== */\n\n#settingLayerMask {\n  display: none;\n  justify-content: center;\n  align-items: center;\n  position: fixed;\n  inset: 0;\n  background-color: rgba(16, 18, 22, 0.42);\n  backdrop-filter: blur(12px);\n  z-index: 200000000;\n  overflow: auto;\n  font-family: var(--sej-font-family);\n  min-height: 100%;\n  font-size: 14px;\n  transition: opacity 0.15s ease-out;\n  opacity: 0;\n  animation: sej-setting-mask-in 0.15s ease;\n  user-select: none;\n  -moz-user-select: none;\n  padding-bottom: 80px;\n  box-sizing: border-box;\n  color: var(--font-color-qxin);\n}\n#settingLayer {\n  display: flex;\n  flex-direction: column;\n  box-sizing: border-box;\n  --sej-panel-pad-x: 20px;\n  --sej-panel-pad-top: 16px;\n  padding: var(--sej-panel-pad-top) var(--sej-panel-pad-x) 16px;\n  background-color: var(--background-setting-qxin);\n  border: 1px solid var(--border-color-sej);\n  border-radius: 16px;\n  box-shadow: var(--sej-panel-shadow);\n  position: absolute;\n  width: auto;\n  min-width: min(720px, calc(100vw - 32px));\n  max-width: min(960px, calc(100vw - 32px));\n  max-height: calc(100vh - 48px);\n  margin: 0;\n  overflow: visible;\n  animation: sej-panel-in 0.16s ease-out;\n}\n@keyframes sej-panel-in {\n  from {\n    opacity: 0;\n    transform: translateY(6px) scale(0.99);\n  }\n}\n.sej-panel-header {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 12px;\n  flex: 0 0 auto;\n  padding: 0 2px 12px;\n  cursor: move;\n}\n.sej-panel-title {\n  font-size: 15px;\n  font-weight: 600;\n  letter-spacing: 0.01em;\n}\n.sej-panel-close {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  width: 28px;\n  height: 28px;\n  padding: 0;\n  border: none;\n  border-radius: 8px;\n  background: transparent;\n  color: inherit;\n  font-size: 15px;\n  line-height: 1;\n  cursor: pointer;\n  opacity: 0.55;\n  transition: background-color 0.12s ease-out, opacity 0.12s ease-out;\n}\n.sej-panel-close:hover {\n  opacity: 1;\n  background: var(--sej-surface-hover);\n}\n.iqxin-items {\n  display: flex;\n  flex-direction: column;\n  flex: 0 0 220px;\n  width: 220px;\n  min-width: 0;\n  max-width: 220px;\n  box-sizing: border-box;\n  margin: 0;\n  padding: 6px;\n  border-radius: 12px;\n  border: 1px solid var(--border-color-sej);\n  background: var(--sej-surface-2);\n}\n.sej-add-category-card {\n  align-items: center;\n  justify-content: center;\n  min-height: 140px;\n  background: transparent;\n  border: 1px dashed var(--sej-checkbox-border);\n  color: var(--font-color-qxin);\n  cursor: pointer;\n  transition: background-color 0.12s ease-out, border-color 0.12s ease-out,\n    color 0.12s ease-out;\n}\n.sej-add-category-card:hover {\n  background: var(--sej-surface-hover);\n  border-color: var(--sej-accent);\n  color: var(--sej-accent);\n}\n.sej-add-category-card:focus-visible {\n  background: var(--sej-surface-hover);\n  outline: 2px solid var(--sej-accent);\n  outline-offset: 2px;\n}\n.sej-add-category-plus {\n  font-size: 42px;\n  font-weight: 300;\n  line-height: 1;\n  opacity: 0.45;\n  transition: opacity 0.12s ease-out;\n}\n.sej-add-category-card:hover .sej-add-category-plus {\n  opacity: 1;\n}\n.sejcon {\n  display: flex;\n  flex-direction: column;\n  flex: 1 1 auto;\n}\n.sejcon > .drag {\n  flex: 0 0 auto;\n}\n#settingLayer .drag {\n  display: block;\n  position: relative;\n}\n#settingLayer .sej-engine {\n  padding: 0 82px 0 8px;\n  width: 100%;\n  height: 30px;\n  box-sizing: border-box;\n  border-radius: 8px;\n  font-size: 13px;\n  cursor: default;\n}\n#settingLayer .sej-engine > span {\n  flex: 0 1 auto;\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n.iqxin-pointer-events,\n.sej-engine-icon,\n#settingLayer .sej-engine * {\n  pointer-events: none;\n}\n.sejtitle {\n  text-align: left;\n  padding: 5px 82px 5px 8px;\n  margin-bottom: 2px;\n  overflow: hidden;\n  white-space: nowrap;\n  text-overflow: ellipsis;\n  cursor: default;\n  position: relative;\n  font-size: 13px;\n  font-weight: 600;\n  line-height: 1.5;\n  border-radius: 8px;\n  transition: background-color 0.12s ease-out;\n}\n#settingLayerMask [data-xin] {\n  margin: 1px 0;\n  border-radius: 8px;\n}\n#settingLayerMask .iqxin-set-edit,\n#settingLayerMask .iqxin-set-del,\n#settingLayerMask .iqxin-title-edit,\n#settingLayerMask .iqxin-set-title-del {\n  border-radius: 6px;\n  line-height: 1em;\n  margin-right: 2px;\n}\n.sejcon [data-xin] {\n  cursor: pointer;\n}\n#settingLayerMask [data-iqxindisabled=\"true\"],\n[data-xin^=\"-\"] {\n  background-color: var(--sej-danger-weak);\n  text-decoration: line-through !important;\n  text-decoration-color: var(--sej-danger) !important;\n  transition: background-color 0.12s ease-out;\n}\n.sejtitle:not([data-xin^=\"-\"]):hover {\n  background: var(--sej-surface-hover);\n}\n#settingLayerMask .sej-engine:hover {\n  background-color: var(--sej-surface-hover);\n}\n#settingLayerMask [data-iqxindisabled=\"true\"]:hover,\n[data-xin^=\"-\"]:hover {\n  background-color: var(--sej-danger-weak);\n}\n#settingLayerMask label {\n  cursor: pointer;\n}\n#settingLayerMask .sej-engine-icon {\n  vertical-align: middle;\n}\n#btnEle {\n  position: relative;\n  width: 100%;\n  background: transparent;\n  border-radius: 0;\n  flex: 0 0 auto;\n}\n#btnEle {\n  margin-top: 10px;\n}\n#btnEle span {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  gap: 6px;\n  background: var(--sej-btn-bg);\n  border: 1px solid var(--border-color-sej);\n  margin: 0;\n  color: var(--font-color-qxin);\n  padding: 6px 12px;\n  border-radius: 8px;\n  font-size: 13px;\n  line-height: 1.35;\n  cursor: pointer;\n  outline: none;\n  transition: background-color 0.12s ease-out, border-color 0.12s ease-out,\n    color 0.12s ease-out, opacity 0.12s ease-out;\n}\n#btnEle label {\n  display: inline-flex;\n  align-items: center;\n  gap: 6px;\n  color: inherit;\n}\n#btnEle span:hover {\n  background: var(--sej-surface-hover);\n  color: var(--font-color-qxin);\n}\n#btnEle a {\n  color: var(--font-color-qxin);\n  opacity: 0.7;\n  text-decoration: none;\n  font-family: inherit;\n  transition: opacity 0.12s ease-out, color 0.12s ease-out;\n}\n#btnEle a:hover {\n  opacity: 1;\n  color: var(--sej-accent);\n}\n#btnEle .feedback {\n  background: transparent;\n  border-color: transparent;\n  padding: 6px 6px;\n}\n#btnEle .feedback:hover {\n  background: transparent;\n  border-color: transparent;\n}\n#btnEle > div {\n  width: 100%;\n  display: flex;\n  flex-wrap: wrap;\n  justify-content: flex-start;\n  align-items: center;\n  gap: 8px;\n  box-sizing: border-box;\n}\n#btnEle > div {\n  background: transparent;\n  border-radius: 0;\n  border-top: 1px solid var(--border-color-sej);\n  padding-top: 14px;\n  gap: 10px 12px;\n}\n.sej-footer-links,\n.sej-footer-options,\n.sej-footer-actions {\n  display: flex;\n  align-items: center;\n  flex-wrap: wrap;\n  gap: 8px;\n  min-width: 0;\n}\n.sej-footer-options {\n  order: 1;\n  flex: 1 1 100%;\n}\n.sej-footer-links {\n  order: 2;\n}\n.sej-footer-actions {\n  order: 3;\n  margin-left: auto;\n}\n#btnEle #xin-save {\n  background: var(--sej-accent);\n  border-color: transparent;\n  color: var(--sej-accent-contrast);\n  font-weight: 600;\n}\n#btnEle #xin-save:hover {\n  background: var(--sej-accent);\n  color: var(--sej-accent-contrast);\n  opacity: 0.85;\n}\n#btnEle #xin-save.sej-saving {\n  cursor: progress;\n  opacity: 0.6;\n  pointer-events: none;\n}\n#btnEle span.iqxin-btn-active {\n  background: var(--sej-accent-weak);\n  border-color: var(--sej-accent);\n  color: var(--sej-accent);\n}\n#settingLayerMask input[type=\"checkbox\"] {\n  appearance: none;\n  -webkit-appearance: none;\n  width: 16px;\n  height: 16px;\n  display: inline-block;\n  box-sizing: border-box;\n  vertical-align: -3px;\n  margin: 0 !important;\n  padding: 0;\n  position: relative;\n  border: 1.5px solid var(--sej-checkbox-border);\n  border-radius: 5px;\n  background: var(--sej-input-bg);\n  cursor: pointer;\n  transition: background-color 0.12s ease-out, border-color 0.12s ease-out;\n}\n#settingLayerMask input[type=\"checkbox\"]:before {\n  content: none;\n}\n#settingLayerMask input[type=\"checkbox\"]:checked {\n  background: var(--sej-accent);\n  border-color: var(--sej-accent);\n}\n#settingLayerMask input[type=\"checkbox\"]:checked:after {\n  content: \"\";\n  position: absolute;\n  left: 4px;\n  top: 1px;\n  width: 4px;\n  height: 8px;\n  border: solid var(--sej-accent-contrast);\n  border-width: 0 2px 2px 0;\n  background: none;\n  transform: rotate(45deg);\n}\n.drop-over {\n  opacity: 0.6;\n}\n.iqxin-title-edit,\n.iqxin-set-edit,\n.iqxin-set-title-del,\n.iqxin-set-del,\n.iqxin-set-toggle {\n  visibility: visible;\n  opacity: 0.6;\n  position: absolute;\n  background: transparent;\n  top: 50%;\n  transform: translate(0, -50%);\n  padding: 3px;\n  border-radius: 6px;\n  cursor: pointer;\n  transition: opacity 0.12s ease-out, background-color 0.12s ease-out,\n    color 0.12s ease-out;\n}\n.iqxin-title-edit,\n.iqxin-set-edit {\n  right: 30px;\n}\n.iqxin-set-title-del,\n.iqxin-set-del {\n  right: 2px;\n}\n.iqxin-set-toggle {\n  right: 58px;\n  display: inline-flex;\n  align-items: center;\n  color: var(--font-color-qxin);\n}\n.iqxin-set-toggle svg {\n  display: block;\n}\n.iqxin-set-toggle.iqxin-set-hidden {\n  opacity: 0.35;\n}\n.iqxin-title-edit:hover,\n.iqxin-set-edit:hover,\n.iqxin-set-title-del:hover,\n.iqxin-set-del:hover,\n.iqxin-set-toggle:hover {\n  opacity: 1;\n  background: var(--sej-surface-hover);\n}\nspan.iqxin-additem {\n  display: inline-block;\n  text-align: center;\n  width: 100%;\n  box-sizing: border-box;\n  margin: auto 0 2px;\n  padding: 5px 0;\n  border: 1px dashed var(--sej-checkbox-border);\n  border-radius: 8px;\n  color: var(--font-color-qxin);\n  opacity: 0.55;\n  cursor: pointer;\n  visibility: visible;\n  transition: opacity 0.12s ease-out, border-color 0.12s ease-out,\n    color 0.12s ease-out;\n}\nspan.iqxin-additem:hover {\n  opacity: 1;\n  border-color: var(--sej-accent);\n  color: var(--sej-accent);\n}\n#newSearchListBox,\n#newSearchBox {\n  position: fixed;\n  z-index: 200000100;\n  top: 50%;\n  left: 50%;\n  transform: translate(-50%, -50%);\n  width: min(400px, calc(100vw - 32px));\n  box-sizing: border-box;\n  padding: 20px;\n  background: var(--background-setting-qxin);\n  border: 1px solid var(--border-color-sej);\n  border-radius: 14px;\n  box-shadow: var(--sej-shadow-menu);\n  color: var(--font-color-qxin);\n  margin: 0;\n  transition: opacity 0.14s ease-out, transform 0.14s ease-out;\n}\n.sej-dialog-title {\n  font-size: 15px;\n  font-weight: 600;\n  margin-bottom: 16px;\n}\n.sej-field {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  margin-bottom: 12px;\n  font-size: 12px;\n}\n.sej-field > span {\n  opacity: 0.65;\n}\n.sej-field-data {\n  display: block;\n  flex: 1 1 auto;\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  color: var(--sej-accent);\n  font-size: 12px;\n  user-select: text;\n  -webkit-user-select: text;\n}\n.sej-field-row {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n}\n.sej-field-row input {\n  flex: 1 1 0;\n  width: auto;\n  min-width: 0;\n}\n.sej-icon-preview-btn {\n  flex: 0 0 auto;\n  padding: 7px 12px;\n  border: 1px solid var(--border-color-sej);\n  border-radius: 8px;\n  background: var(--sej-btn-bg);\n  color: var(--font-color-qxin);\n  font-family: inherit;\n  font-size: 12px;\n  line-height: 1.4;\n  cursor: pointer;\n  transition: border-color 0.12s ease-out, color 0.12s ease-out;\n}\n.sej-icon-preview-btn:hover:not(:disabled) {\n  border-color: var(--sej-accent);\n  color: var(--sej-accent);\n}\n.sej-icon-preview-btn:disabled {\n  opacity: 0.5;\n  cursor: not-allowed;\n}\n.sej-icon-preview {\n  flex: 0 0 auto;\n  width: 20px;\n  height: 20px;\n  object-fit: contain;\n  border-radius: 4px;\n  background: var(--sej-surface-hover);\n}\n.sej-data-line {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  min-width: 0;\n}\n.sej-field-value {\n  color: var(--font-color-qxin);\n  opacity: 0.5;\n  font-size: 12px;\n}\n.sej-field-inline {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  font-size: 13px;\n  cursor: pointer;\n}\n.sej-dialog-actions {\n  display: flex;\n  justify-content: flex-end;\n  gap: 8px;\n  margin-top: 16px;\n}\n#newSearchListBox input,\n#newSearchBox input {\n  width: 100%;\n  box-sizing: border-box;\n  border: 1px solid var(--border-color-sej);\n  padding: 7px 9px;\n  border-radius: 8px;\n  outline: none;\n  color: var(--font-color-qxin);\n  background: var(--sej-input-bg);\n  font-family: inherit;\n  font-size: 13px;\n  transition: border-color 0.12s ease-out, box-shadow 0.12s ease-out;\n}\n#newSearchBox #iqxin-newTarget {\n  width: 100%;\n  border-radius: 8px;\n  border: 1px solid var(--border-color-sej);\n  padding: 7px 9px;\n  background: var(--sej-input-bg);\n  color: var(--font-color-qxin);\n  font-family: inherit;\n  font-size: 13px;\n  outline: none;\n}\n.iqxin-help-link {\n  color: var(--font-color-qxin);\n  opacity: 0.6;\n}\n#newSearchListBox input:focus,\n#newSearchBox input:focus {\n  background: var(--sej-input-bg);\n  border-color: var(--sej-accent);\n  box-shadow: 0 0 0 3px var(--sej-focus-ring);\n}\n.addItemBoxBtn {\n  cursor: pointer;\n  background: var(--sej-btn-bg);\n  border: 1px solid var(--border-color-sej);\n  border-radius: 8px;\n  padding: 6px 14px;\n  color: var(--font-color-qxin);\n  font-family: inherit;\n  font-size: 13px;\n  transition: background-color 0.12s ease-out, border-color 0.12s ease-out,\n    color 0.12s ease-out;\n}\n.addItemBoxBtn:hover {\n  background: var(--sej-surface-hover);\n}\n#xin-centerDisplay select,\n#xin-newtab select {\n  height: auto;\n  border: 1px solid var(--border-color-sej);\n  outline: none;\n  color: var(--font-color-qxin);\n  font-size: 13px;\n  font-family: inherit;\n  padding: 3px 6px;\n  border-radius: 6px;\n  cursor: pointer;\n  text-decoration: none;\n  background: var(--sej-input-bg);\n  transition: border-color 0.12s ease-out;\n}\n#xin-centerDisplay select:focus,\n#xin-newtab select:focus {\n  border-color: var(--sej-accent);\n}\n#xin-centerDisplay select option,\n#xin-newtab select option {\n  background: var(--sej-input-bg);\n  color: var(--font-color-qxin);\n}\n#titleEdit {\n  width: 8em;\n  box-sizing: border-box;\n  border: 1px solid var(--sej-accent);\n  border-radius: 6px;\n  padding: 2px 6px;\n  background: var(--sej-input-bg);\n  color: var(--font-color-qxin);\n  font-family: inherit;\n  font-size: 13px;\n  outline: none;\n}\n.iqxin-closeBtn,\n.iqxin-enterBtn {\n  box-sizing: border-box;\n}\n.iqxin-enterBtn {\n  background: var(--sej-accent);\n  border-color: transparent;\n  color: var(--sej-accent-contrast);\n  font-weight: 600;\n}\n.iqxin-enterBtn:hover {\n  background: var(--sej-accent);\n  border-color: transparent;\n  color: var(--sej-accent-contrast);\n  opacity: 0.85;\n}\n.iqxin-closeBtn:hover {\n  background: var(--sej-danger-weak);\n  border-color: var(--sej-danger);\n  color: var(--sej-danger);\n}\n#iqxin-editCodeBox {\n  position: fixed;\n  top: 50%;\n  left: 50%;\n  transform: translate(-50%, -50%);\n  z-index: 200000100;\n  width: min(560px, calc(100vw - 32px));\n  max-height: calc(100vh - 48px);\n  box-sizing: border-box;\n  display: flex;\n  flex-direction: column;\n  gap: 10px;\n  padding: 20px;\n  background: var(--background-setting-qxin);\n  border: 1px solid var(--border-color-sej);\n  border-radius: 14px;\n  box-shadow: var(--sej-shadow-menu);\n  color: var(--font-color-qxin);\n}\n#iqxin-editCodeBox p {\n  margin: 0;\n}\n#iqxin-editCodeBox button {\n  cursor: pointer;\n  background: var(--sej-btn-bg);\n  border: 1px solid var(--border-color-sej);\n  border-radius: 8px;\n  padding: 6px 14px;\n  color: var(--font-color-qxin);\n  font-family: inherit;\n  font-size: 13px;\n  transition: background-color 0.12s ease-out, border-color 0.12s ease-out,\n    color 0.12s ease-out;\n}\n#iqxin-editCodeBox button:hover {\n  background: var(--sej-surface-hover);\n}\n#iqxin-editCodeBox .iqxin-enterBtn {\n  background: var(--sej-accent);\n  border-color: transparent;\n  color: var(--sej-accent-contrast);\n}\n#iqxin-editCodeBox .iqxin-closeBtn:hover {\n  background: var(--sej-danger-weak);\n  border-color: var(--sej-danger);\n  color: var(--sej-danger);\n}\n#iqxin-editCodeBox textarea {\n  width: 100%;\n  box-sizing: border-box;\n  flex: 1 1 auto;\n  min-height: 240px;\n  padding: 10px;\n  overflow: auto;\n  border: 1px solid var(--border-color-sej);\n  border-radius: 10px;\n  background: var(--sej-input-bg);\n  color: var(--font-color-qxin);\n  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n  font-size: 12px;\n  line-height: 1.5;\n  resize: vertical;\n  outline: none;\n}\n#iqxin-editCodeBox textarea:focus {\n  border-color: var(--sej-accent);\n  box-shadow: 0 0 0 3px var(--sej-focus-ring);\n}\n.iqxin-warning {\n  color: var(--sej-danger);\n  font-size: 14px;\n  font-weight: 600;\n}\n#importingBox {\n  position: fixed;\n  width: min(350px, calc(100vw - 32px));\n  top: 50%;\n  left: 50%;\n  transform: translate(-50%, -50%);\n  padding: 16px 24px;\n  border: 1px solid var(--border-color-sej);\n  border-radius: 12px;\n  background: var(--background-setting-qxin);\n  color: var(--font-color-qxin);\n}\n#importingBox li {\n  margin: 5px;\n  border-bottom: 1px solid var(--border-color-sej);\n}\n#importingBox li p {\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  margin-top: 0;\n  margin-bottom: 0;\n}\n.xin-importing-item {\n  cursor: pointer;\n}\n#setBtn {\n  transition: background-color 0.08s ease-out, opacity 0.08s ease-out;\n  width: 30px;\n  height: 30px;\n  flex: 0 0 auto;\n  padding: 0;\n  border-radius: 8px;\n  align-items: center;\n  justify-content: center;\n  cursor: pointer;\n  display: flex;\n  opacity: 0.65;\n}\nspan#setBtn:hover {\n  opacity: 1;\n  background-color: var(--sej-hover-bg, var(--background-hover-color-qxin));\n}\nspan#setBtn:active {\n  background-color: var(--sej-active-bg, rgba(0, 0, 0, 0.1));\n}\n#sej-container {\n  display: flex;\n  align-items: center;\n  position: relative;\n  z-index: 2;\n  padding: 2px;\n  gap: 2px;\n  font-size: 13px;\n  font-family: var(--sej-font-family);\n  -webkit-font-smoothing: antialiased;\n  transform-origin: top center;\n  animation: sejopen 0.14s ease-out;\n  color: var(--font-color-qxin);\n  background: var(--sej-bar-bg, var(--background-color-qxin));\n  backdrop-filter: blur(20px) saturate(180%);\n  width: max-content !important;\n  max-width: 100%;\n  box-sizing: border-box;\n  border-radius: var(--sej-radius-bar, 12px);\n  border: 1px solid var(--border-color-sej);\n  overflow: auto;\n  box-shadow: var(\n    --sej-shadow-bar,\n    0 1px 2px hsla(0, 0%, 0%, 0.06),\n    0 8px 24px -12px hsla(0, 0%, 0%, 0.35)\n  );\n  height: fit-content;\n  flex-wrap: wrap;\n  justify-content: center;\n  user-select: none;\n}\n/* 给用户的提示 */\n#iqixn-global-tip {\n  box-sizing: content-box !important;\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  opacity: 0;\n  height: 25px;\n  line-height: 25px;\n  letter-spacing: 1px;\n  font-size: 14px;\n  color: #fff;\n  padding: 5px 20px;\n  border-radius: 8px;\n  background-color: #666;\n  position: fixed;\n  z-index: 200000001;\n  left: 50%;\n  bottom: 5%;\n  transform: translate(-50%);\n  pointer-events: none;\n  transition: opacity 0.15s ease-out;\n}\n#iqixn-global-tip.sej-toast-visible {\n  pointer-events: auto;\n}\n#iqixn-global-tip .sej-toast-action {\n  pointer-events: auto;\n  border: none;\n  border-radius: 6px;\n  padding: 2px 10px;\n  background: rgba(255, 255, 255, 0.2);\n  color: #fff;\n  font: inherit;\n  letter-spacing: inherit;\n  line-height: 20px;\n  cursor: pointer;\n  transition: background-color 0.12s ease-out;\n}\n#iqixn-global-tip .sej-toast-action:hover {\n  background: rgba(255, 255, 255, 0.34);\n}\n/* 夜间模式 - 默认主题变量 */\n:root,\n:host,\nbody {\n  --font-color-qxin: #333;\n  --background-color-qxin: #fffffff0;\n  --background-avtive-color-qxin: #ccc;\n  --background-active-enable-qxin: #cff9ff;\n  --background-active-disable-qxin: #ffa2a2;\n  --background-hover-color-qxin: #eaeaea;\n  --trigger-shown-qxin: #f1f3f4 !important;\n  --background-btn-qxin: #eff4f8;\n  --background-setting-qxin: #fff;\n  --box-shadow-color-sej: hsla(0, 0%, 0%, 7%);\n  --border-color-sej: #e1e6ea;\n\n  /* 跳转条现代化外观 */\n  --sej-font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\",\n    \"PingFang SC\", \"Hiragino Sans GB\", \"Microsoft YaHei\", sans-serif;\n  --sej-bar-bg: rgba(255, 255, 255, 0.88);\n  --sej-hover-bg: rgba(0, 0, 0, 0.055);\n  --sej-active-bg: rgba(0, 0, 0, 0.1);\n  --sej-accent: #4285f4;\n  --sej-accent-weak: rgba(66, 133, 244, 0.12);\n  --sej-radius-bar: 12px;\n  --sej-radius-item: 8px;\n  --sej-radius-menu: 12px;\n  --sej-shadow-bar: 0 1px 2px hsla(0, 0%, 0%, 0.06),\n    0 8px 24px -12px hsla(0, 0%, 0%, 0.35);\n  --sej-shadow-menu: 0 2px 6px hsla(0, 0%, 0%, 0.06),\n    0 16px 40px -12px hsla(0, 0%, 0%, 0.3);\n\n  /* 设置面板 */\n  --sej-surface-2: rgba(0, 0, 0, 0.025);\n  --sej-surface-hover: rgba(0, 0, 0, 0.06);\n  --sej-input-bg: #fff;\n  --sej-btn-bg: #fff;\n  --sej-checkbox-border: #cfd5dd;\n  --sej-focus-ring: rgba(66, 133, 244, 0.22);\n  --sej-accent-contrast: #fff;\n  --sej-danger: #d93025;\n  --sej-danger-weak: rgba(217, 48, 37, 0.1);\n  --sej-panel-shadow: 0 24px 64px -24px hsla(0, 0%, 0%, 0.45),\n    0 2px 8px hsla(0, 0%, 0%, 0.06);\n}\n/* 暗黑模式变量 - 当主文档是暗黑模式时 */\n:root[qxintheme=\"dark\"],\n:host[qxintheme=\"dark\"],\nbody[qxintheme=\"dark\"] {\n  --font-color-qxin: #bdc1bc;\n  --background-color-qxin: #202124f0;\n  --background-avtive-color-qxin: #424242;\n  --background-active-enable-qxin: #274144;\n  --background-active-disable-qxin: #583535;\n  --background-hover-color-qxin: #424242;\n  --trigger-shown-qxin: #3c4043 !important;\n  --background-btn-qxin: #292f36;\n  --background-setting-qxin: #202124;\n  --box-shadow-color-sej: hsla(0, 0%, 70%, 10%);\n  --border-color-sej: #3b4547;\n\n  --sej-bar-bg: rgba(32, 33, 36, 0.9);\n  --sej-hover-bg: rgba(255, 255, 255, 0.09);\n  --sej-active-bg: rgba(255, 255, 255, 0.14);\n  --sej-accent: #8ab4f8;\n  --sej-accent-weak: rgba(138, 180, 248, 0.18);\n  --sej-shadow-bar: 0 1px 2px hsla(0, 0%, 0%, 0.5),\n    0 8px 24px -12px hsla(0, 0%, 0%, 0.8);\n  --sej-shadow-menu: 0 2px 6px hsla(0, 0%, 0%, 0.5),\n    0 16px 40px -12px hsla(0, 0%, 0%, 0.85);\n\n  --sej-surface-2: rgba(255, 255, 255, 0.045);\n  --sej-surface-hover: rgba(255, 255, 255, 0.09);\n  --sej-input-bg: #17181a;\n  --sej-btn-bg: rgba(255, 255, 255, 0.04);\n  --sej-checkbox-border: #4a5459;\n  --sej-focus-ring: rgba(138, 180, 248, 0.3);\n  --sej-accent-contrast: #202124;\n  --sej-danger: #f28b82;\n  --sej-danger-weak: rgba(242, 139, 130, 0.14);\n  --sej-panel-shadow: 0 24px 64px -20px hsla(0, 0%, 0%, 0.85),\n    0 2px 8px hsla(0, 0%, 0%, 0.5);\n}\n/* 滑词搜索样式 */\n#sej-container.selectSearch {\n  position: fixed;\n  top: 2px;\n  left: 0;\n  right: 0;\n  z-index: 99999999;\n  margin: 0 auto;\n  transform: translateY(calc(-100% - 10px));\n  visibility: hidden;\n  pointer-events: none;\n  transition: transform 0.3s, visibility 0s linear 0.3s;\n}\n#sej-container.selectSearch.sej-select-visible {\n  transform: none;\n  visibility: visible;\n  pointer-events: auto;\n  transition: transform 0.3s, visibility 0s linear 0s;\n}\n#sej-expanded-category {\n  font-weight: bold;\n}\n.sej-category {\n  display: inline-flex;\n  align-items: center;\n}\n.sej-category-title {\n  font-weight: 600;\n  padding: 0 12px;\n  opacity: 0.8;\n}\n.sej-engine {\n  padding: 0 13px;\n  transition: background-color 0.08s ease-out, opacity 0.08s ease-out;\n  font-size: 13px;\n  font-family: var(--sej-font-family);\n  display: inline-flex;\n  gap: 8px;\n  align-items: center;\n  height: 2.6em;\n  box-sizing: border-box;\n  text-decoration: none !important;\n  color: var(--font-color-qxin) !important;\n  cursor: pointer;\n  white-space: nowrap;\n}\n#sej-container > .sej-engine,\n#sej-container .sej-category > .sej-engine {\n  height: 30px;\n  padding: 0 11px;\n  gap: 6px;\n  border-radius: var(--sej-radius-item, 8px);\n  font-weight: 500;\n}\n.sej-drop-list a:visited,\n.sej-drop-list a:hover,\n.sej-engine a:visited,\n.sej-engine a:hover,\n#sej-container a:link,\n#sej-container a:visited,\n#sej-container a:hover {\n  color: var(--font-color-qxin);\n}\n.sej-engine:hover {\n  background-color: var(--sej-hover-bg, var(--background-hover-color-qxin));\n}\n.sej-engine:active {\n  background-color: var(--sej-active-bg, rgba(0, 0, 0, 0.1));\n}\n#sej-container .sej-engine:focus-visible {\n  outline: 2px solid var(--sej-accent, #4285f4);\n  outline-offset: -2px;\n}\n.sej-engine.sej-drop-list-trigger-shown {\n  background-color: var(--trigger-shown-qxin);\n}\n.sej-drop-list > .sej-engine {\n  display: flex;\n  justify-content: flex-start;\n  width: 100%;\n  height: 30px;\n  padding: 0 10px;\n  gap: 8px;\n  border-radius: var(--sej-radius-item, 8px);\n  font-weight: 400;\n}\n.sej-drop-list > .sej-engine + .sej-engine {\n  margin-top: 1px;\n}\n\n.sej-engine-icon {\n  width: 16px;\n  height: 16px;\n  flex: 0 0 auto;\n  object-fit: cover;\n  display: inline-block;\n  margin: 0;\n}\n.sej-engine-icon:not([src]) {\n  display: none;\n}\n\n.sej-drop-list {\n  /* 使用 fixed 定位确保在 Shadow DOM 中位置正确 */\n  position: fixed;\n  display: none;\n  opacity: 0.2;\n  top: -10000px;\n  left: 0;\n  min-width: 128px;\n  padding: 6px;\n  box-sizing: border-box;\n  text-align: left;\n  font-size: 13px;\n  font-family: var(--sej-font-family);\n  -webkit-font-smoothing: antialiased;\n  box-shadow: var(\n    --sej-shadow-menu,\n    0 2px 6px hsla(0, 0%, 0%, 0.06),\n    0 16px 40px -12px hsla(0, 0%, 0%, 0.3)\n  );\n  background-color: var(--sej-bar-bg, var(--background-color-qxin));\n  backdrop-filter: blur(20px) saturate(180%);\n  transition: opacity 0.08s ease-out;\n  animation: sej-drop-menu-in 0.1s ease-out;\n  overflow: hidden;\n  border-radius: var(--sej-radius-menu, 12px);\n  border: 1px solid var(--border-color-sej);\n  user-select: none;\n}\n@keyframes sej-drop-menu-in {\n  from {\n    opacity: 0;\n    transform: translateY(-4px) scale(0.98);\n  }\n}\n@keyframes sej-setting-mask-in {\n  from {\n    opacity: 0;\n  }\n}\n@keyframes sejopen {\n  0% {\n    transform: translateY(-4px) scale(0.98);\n    opacity: 0;\n  }\n  100% {\n    transform: none;\n    opacity: 1;\n  }\n}\n@keyframes iqxinsejopen {\n  0% {\n    transform: scale(0.01, 0.01);\n    opacity: 0;\n  }\n  100% {\n    transform: scale(1, 1);\n    opacity: 1;\n  }\n}\n\n/* ---------- Vue 重构版设置面板布局优化 ---------- */\n#settingLayerMask {\n  padding: 20px;\n  box-sizing: border-box;\n}\n\n#sej-settings-body {\n  display: flex;\n  flex: 1 1 auto;\n  flex-wrap: wrap;\n  align-content: flex-start;\n  gap: 10px;\n  min-height: 0;\n  overflow-y: auto;\n  overflow-x: hidden;\n  /* 让滚动条贴住面板内边缘，而不是停在内容区的内边距处 */\n  margin-top: 0;\n  margin-right: calc(var(--sej-panel-pad-x) * -1);\n  padding-top: 2px;\n  padding-right: var(--sej-panel-pad-x);\n  padding-bottom: 4px;\n}\n#sej-settings-body::-webkit-scrollbar {\n  width: 8px;\n}\n#sej-settings-body::-webkit-scrollbar-thumb {\n  background: var(--sej-surface-hover);\n  border-radius: 4px;\n}\n#settingLayer #btnEle {\n  flex: 0 0 auto;\n}\n\n@media (max-width: 780px) {\n  #btnEle span {\n    font-size: 12px;\n    padding: 5px 8px;\n  }\n  #settingLayer {\n    --sej-panel-pad-x: 12px;\n    min-width: calc(100vw - 16px);\n    max-width: calc(100vw - 16px);\n    max-height: calc(100vh - 16px);\n  }\n}\n\n@media (max-width: 560px) {\n  .iqxin-items {\n    flex: 1 1 160px;\n    width: auto;\n    max-width: none;\n  }\n}\n";
 	var DARK_MODE_STYLE = `
   :root,
   :host {
@@ -16452,17 +16968,25 @@
 		app = createApp(_sfc_main);
 		app.mount(getRoot());
 		if (!menuRegistered) {
-			try {
-				_GM_registerMenuCommand("设置菜单", openSettingPanel);
+			const gmNamespace = typeof globalThis !== "undefined" ? globalThis.GM : void 0;
+			const gmMenu = gmNamespace && typeof gmNamespace["registerMenuCommand"] === "function" ? gmNamespace["registerMenuCommand"].bind(gmNamespace) : null;
+			const registerMenu = typeof _GM_registerMenuCommand === "function" ? _GM_registerMenuCommand : gmMenu;
+			if (registerMenu) try {
+				registerMenu("设置菜单", openSettingPanel);
+				menuRegistered = true;
 			} catch (e) {
 				console.warn("[SEJ] 注册菜单命令失败", e);
 			}
-			menuRegistered = true;
+			else {
+				menuRegistered = true;
+				console.info("[SEJ] 当前脚本管理器不支持菜单命令，可使用跳转条右侧的设置按钮");
+			}
 		}
 	}
-	function startScript() {
+	async function startScript() {
 		if (window.self != window.top) return;
 		printBanner();
+		await initStorage([STORAGE_KEY]);
 		if (DELAY_LIST.some((re) => location.href.search(re) !== -1)) setTimeout(() => {
 			if (!isRunning()) boot();
 		}, 1e3);
@@ -16505,7 +17029,38 @@
 			startScript();
 		});
 	}
+	var settingsSyncStarted = false;
+	var settingsSyncTimer = null;
+	var pollTimer = null;
+	function applyRemoteSettings() {
+		if (ui.settingPanelOpen) {
+			showToast("其他页面已更新设置，关闭设置面板后刷新页面生效", 3e3);
+			return;
+		}
+		if (!useSettings().reload()) return;
+		restart();
+		showToast("设置已从其他页面同步");
+	}
+	function setupSettingsSync() {
+		if (settingsSyncStarted) return;
+		settingsSyncStarted = true;
+		watchValue(STORAGE_KEY, () => {
+			clearTimeout(settingsSyncTimer);
+			settingsSyncTimer = setTimeout(applyRemoteSettings, 200);
+		});
+		const poll = async () => {
+			if (ui.settingPanelOpen || document.hidden) return;
+			if (await pullLatest("searchEngineJumpData")) applyRemoteSettings();
+		};
+		clearInterval(pollTimer);
+		pollTimer = setInterval(poll, 2e3);
+		document.addEventListener("visibilitychange", () => {
+			if (!document.hidden) poll();
+		});
+		window.addEventListener("focus", poll);
+	}
 	onRestartRequest(restart);
 	startScript();
 	listenUrlChange();
+	setupSettingsSync();
 })();

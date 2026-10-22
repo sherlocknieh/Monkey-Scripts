@@ -13,7 +13,7 @@ export default defineConfig({
       userscript: {
         name: 'SearchEngineJump++',
         namespace:'npm/vite-plugin-monkey',
-        version: '2026.10.22.05',
+        version: '2026.10.22.20',
         description:
           'Fork 版本搜索引擎跳转脚本，Vue 重构版。在搜索页插入跳转小横条，支持划词搜索、分类下拉、设置菜单等。',
         author: 'NLF & 锐经 & iqxin & MUTED64',
@@ -23,7 +23,18 @@ export default defineConfig({
         exclude: ['*://mega.nz/*'],
         noframes: true,
         runAt: 'document-idle',
-        grant: ['window.onurlchange'],
+        grant: [
+          'window.onurlchange',
+          'GM_xmlhttpRequest',
+          'GM_addValueChangeListener',
+          'GM_removeValueChangeListener',
+          'GM.getValue',
+          'GM.setValue',
+          'GM.deleteValue',
+          'GM.addValueChangeListener',
+          'GM.removeValueChangeListener',
+        ],
+        connect: ['*'],
       },
       build: {
         fileName: 'search-engine-jump.user.js',

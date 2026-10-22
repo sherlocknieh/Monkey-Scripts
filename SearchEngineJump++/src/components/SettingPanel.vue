@@ -7,9 +7,10 @@ import {
     reactive,
     ref,
 } from 'vue';
-import { GM_deleteValue } from '$';
+import { deleteValue } from '../core/storage.js';
 import { useSettings, STORAGE_KEY } from '../stores/settings.js';
 import { requestRestart } from '../core/appControl.js';
+import { embedFavicon, getFaviconSrc } from '../core/favicon.js';
 import { closeSettingPanel, showToast } from '../stores/ui.js';
 import { EDIT, DEL, EYE, EYE_OFF } from '../data/icons.js';
 import EngineEditDialog from './EngineEditDialog.vue';
@@ -66,6 +67,8 @@ const maskVisible = ref(false);
 const layerStyle = ref({});
 const editingCategory = ref(-1);
 const engineDialog = ref(null);
+const engineSaving = ref(false);
+const saving = ref(false);
 const configOpen = ref(false);
 const online = ref(false);
 
@@ -97,6 +100,7 @@ function buildResult() {
                 url: engine.url,
                 favicon: engine.favicon,
             };
+            if (engine.faviconData) item.faviconData = engine.faviconData;
             if (engine.blank) item.blank = '_blank';
             if (engine.disable) item.disable = true;
             if (engine.gbk) item.gbk = true;
@@ -106,15 +110,83 @@ function buildResult() {
     return result;
 }
 
-function save() {
-    settings.applySettings(buildResult());
-    showToast('保存成功');
-    setTimeout(requestRestart, 0);
+function remoteFaviconEngines() {
+    const list = [];
+    for (const category of draft.categories) {
+        for (const engine of category.engines) {
+            if (
+                !engine.faviconData &&
+                /^https?:\/\//i.test(engine.favicon || '')
+            ) {
+                list.push(engine);
+            }
+        }
+    }
+    return list;
+}
+
+async function embedRemoteFavicons() {
+    const pending = remoteFaviconEngines();
+    let converted = 0;
+    let failed = 0;
+    const worker = async () => {
+        while (pending.length) {
+            const engine = pending.shift();
+            const original = engine.favicon;
+            const dataUrl = await embedFavicon(original);
+            if (dataUrl !== original) {
+                engine.faviconData = dataUrl;
+                converted++;
+            } else {
+                failed++;
+            }
+        }
+    };
+    const workers = Array.from(
+        { length: Math.min(6, pending.length) },
+        () => worker(),
+    );
+    await Promise.all(workers);
+    return { converted, failed };
+}
+
+async function save() {
+    if (saving.value) return;
+    saving.value = true;
+    try {
+        const pending = remoteFaviconEngines().length;
+        let converted = 0;
+        let failed = 0;
+        if (pending) {
+            showToast(`正在内嵌 ${pending} 个图标…`, 60000);
+            ({ converted, failed } = await embedRemoteFavicons());
+        }
+        const backend = settings.applySettings(buildResult());
+        const parts = [];
+        if (converted) parts.push(`已内嵌 ${converted} 个图标`);
+        if (failed) parts.push(`${failed} 个获取失败`);
+        const suffix = parts.length ? `，${parts.join('，')}` : '';
+        if (backend === 'memory') {
+            showToast('保存失败：存储不可用，请用“配置文件”复制备份', 5000);
+            return;
+        }
+        if (backend === 'local') {
+            showToast(
+                `已保存${suffix}（当前仅本网站生效：脚本管理器未提供跨站点存储）`,
+                4000,
+            );
+        } else {
+            showToast(`保存成功${suffix}`);
+        }
+        setTimeout(requestRestart, 0);
+    } finally {
+        saving.value = false;
+    }
 }
 
 function reset() {
     if (confirm('将会删除用户设置！')) {
-        GM_deleteValue(STORAGE_KEY);
+        deleteValue(STORAGE_KEY);
         location.reload();
     }
 }
@@ -309,20 +381,48 @@ function editEngine(ci, ei) {
     };
 }
 
-function submitEngine(engine) {
+function cancelEngineDialog() {
+    if (!engineSaving.value) engineDialog.value = null;
+}
+
+async function submitEngine(engine) {
     const ctx = engineDialog.value;
-    if (!ctx) return;
+    if (!ctx || engineSaving.value) return;
     if (!engine.name || !engine.url) {
         alert('标题和链接必填');
         return;
     }
-    const list = draft.categories[ctx.ci].engines;
-    if (ctx.mode === 'add') {
-        list.push({ ...engine, _id: nextId() });
-    } else {
-        list[ctx.ei] = { ...list[ctx.ei], ...engine };
+    engineSaving.value = true;
+    try {
+        const list = draft.categories[ctx.ci].engines;
+        const existing = ctx.mode === 'edit' ? list[ctx.ei] : null;
+        const original = engine.favicon;
+        const embedded =
+            /^data:/i.test(engine.faviconData || '')
+                ? engine.faviconData
+                : existing?.faviconData && existing.favicon === original
+                  ? existing.faviconData
+                  : await embedFavicon(original);
+        const next =
+            ctx.mode === 'add'
+                ? { ...engine, _id: nextId() }
+                : { ...existing, ...engine };
+        // 保留用户填写的原始链接，内嵌结果单独存放
+        next.favicon = original;
+        if (embedded !== original) {
+            next.faviconData = embedded;
+        } else {
+            delete next.faviconData;
+        }
+        if (ctx.mode === 'add') {
+            list.push(next);
+        } else {
+            list[ctx.ei] = next;
+        }
+        engineDialog.value = null;
+    } finally {
+        engineSaving.value = false;
     }
-    engineDialog.value = null;
 }
 
 function createCategoryKey() {
@@ -497,7 +597,7 @@ onBeforeUnmount(() => {
                                 :data-iqxinlink="engine.url" :data-iqxintarget="engine.blank ? '_blank' : null"
                                 :data-iqxindisabled="engine.disable ? 'true' : null"
                                 :data-iqxingbk="engine.gbk ? 'true' : null">
-                                <img class="sej-engine-icon" :src="engine.favicon" alt="" />
+                                <img class="sej-engine-icon" :src="getFaviconSrc(engine)" alt="" />
                                 <span>{{ engine.name }}</span>
                             </span>
                             <span class="iqxin-set-toggle" :class="{ 'iqxin-set-hidden': engine.disable }"
@@ -576,13 +676,16 @@ onBeforeUnmount(() => {
                         </span>
                     </div>
                     <div class="sej-footer-actions">
-                        <span id="xin-save" title="save & close" @click="save">保存并关闭</span>
+                        <span id="xin-save" title="save & close" :class="{ 'sej-saving': saving }" @click="save">
+                            {{ saving ? '处理图标中…' : '保存并关闭' }}
+                        </span>
                     </div>
                 </div>
             </div>
 
             <EngineEditDialog v-if="engineDialog" :mode="engineDialog.mode" :initial="engineDialog.initial"
-                :resolve-icon="getICON" @submit="submitEngine" @cancel="engineDialog = null" />
+                :busy="engineSaving" :resolve-icon="getICON" @submit="submitEngine"
+                @cancel="cancelEngineDialog" />
 
             <ConfigEditor v-if="configOpen" :initial-text="configText" @save="saveConfig" @reset="reset"
                 @close="configOpen = false" @copy="showToast('复制成功')" />

@@ -1,5 +1,29 @@
 import { GM_addStyle } from '$';
+import { getCSPNonce } from './csp.js';
 import { addStyle } from './shadow.js';
+
+let pageStyleEl = null;
+
+function addPageStyle(cssText) {
+  if (!cssText) return;
+  if (typeof GM_addStyle === 'function') {
+    try {
+      GM_addStyle(cssText);
+      return;
+    } catch (e) {
+      console.warn('[SEJ] GM_addStyle 注入失败，回退到 <style>', e);
+    }
+  }
+
+  if (!pageStyleEl || !pageStyleEl.isConnected) {
+    pageStyleEl = document.createElement('style');
+    pageStyleEl.id = 'sej-page-style';
+    const nonce = getCSPNonce();
+    if (nonce) pageStyleEl.setAttribute('nonce', nonce);
+    (document.head || document.documentElement).appendChild(pageStyleEl);
+  }
+  pageStyleEl.textContent += `\n${cssText}`;
+}
 
 export function getElementBySelector(selector) {
   if (!selector) return null;
@@ -50,7 +74,7 @@ export function resolveRuleStyle(rule, settingData) {
 
 export function applyStylish(rule) {
   if (!rule?.stylish) return;
-  GM_addStyle(rule.stylish);
+  addPageStyle(rule.stylish);
 
   const scriptElementStyles = rule.stylish.match(
     /#sej-container(-wrapper)?\s*\{[^}]+\}/g,

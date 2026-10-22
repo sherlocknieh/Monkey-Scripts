@@ -1,5 +1,6 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { getFaviconSrc } from '../core/favicon.js';
 import { getDropRoot } from '../core/shadow.js';
 import EngineItem from './EngineItem.vue';
 
@@ -131,9 +132,9 @@ onBeforeUnmount(() => {
       @click.prevent.stop="allOpen ? $emit('jumpAll') : $emit('jump', engines[0])"
     >
       <img
-        v-if="iconMode && engines[0].favicon"
+        v-if="iconMode && getFaviconSrc(engines[0])"
         class="sej-engine-icon"
-        :src="engines[0].favicon"
+        :src="getFaviconSrc(engines[0])"
         alt=""
       />
       <span>{{ name }}</span>

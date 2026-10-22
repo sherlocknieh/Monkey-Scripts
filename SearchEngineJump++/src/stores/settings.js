@@ -17,7 +17,7 @@ export const SCRIPT_MESSAGE =
   '(fixedTop: 将搜索栏固定到顶端。 true开启,false关闭)...' +
   '(fixedTopUpward: 固定顶端后，搜索栏下拉不会出现，只有上拉时才出现。 true开启,false关闭)...' +
   '(baiduOffset: 在百度页面鼠标划过的菜单会出现位移,若有使用其他的style样式,可以修改这个来修复二级菜单的偏移)...' +
-  '(getIcon: 自己添加搜索后获取图标的方式。0为自动，能连接谷歌的情况下用谷歌获取，无法连接的情况下，域名加favicon.ico获取；1为域名加favicon获取，2为使用谷歌获取，3为使用dnspot的服务获取(不建议使用)。或者添加网址，关键字使用%s代替，未测试)...' +
+  '(getIcon: 自己添加搜索后获取图标的方式。0为自动，能连接谷歌的情况下用谷歌获取，无法连接的情况下，域名加favicon.ico获取；1为域名加favicon获取，2为使用谷歌获取，3为使用dnspot的服务获取(不建议使用)。或者添加网址，关键字使用%s代替，未测试。保存设置时会把远程图标内嵌为 data URL 存入 faviconData，并保留原始链接 favicon，以兼容 Wikipedia 等严格 CSP 页面)...' +
   '(allOpen:一键搜索，点击相关分类后，打开该分类下的所有搜索)...' +
   '(HideTheSameLink:隐藏同站链接。默认开启,百度页面会隐藏百度搜索。如果想在同一个搜索网站,但是想通过不同语言来搜索, 可以选择false来实现)...' +
   '(center:是否居中显示，主要是为了兼容脚本 ac 百度  ： 0 不居中，强制在左。 1, 强制居中 。 2,自动判断)...' +
@@ -210,7 +210,28 @@ export class Settings {
     Object.assign(this.settingData, plain);
     this.storedSettingData = this.settingData;
     this.initEngineCategories();
-    setValue(STORAGE_KEY, this.settingData);
+    return setValue(STORAGE_KEY, this.settingData);
+  }
+
+  // 从存储重新读取设置（用于其他页面保存后的同步）
+  reload() {
+    const stored = getValue(STORAGE_KEY, null);
+    if (!stored || typeof stored !== 'object') return false;
+    try {
+      if (
+        this.settingData &&
+        JSON.stringify(stored) === JSON.stringify(this.settingData)
+      ) {
+        return false;
+      }
+    } catch (e) {
+      // 比较失败时仍然重新加载
+    }
+    this.storedSettingData = stored;
+    this.settingData = Object.assign({}, stored);
+    this.checkSettingDataIntegrity();
+    this.initEngineCategories();
+    return true;
   }
 
   initEngineCategories() {
