@@ -7,10 +7,7 @@ let pinnedCategory = null;
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { getFaviconSrc } from '../core/favicon.js';
 import { getDropRoot } from '../core/shadow.js';
-import { getValue, setValue } from '../core/storage.js';
 import EngineItem from './EngineItem.vue';
-
-const HINT_KEY = 'sej:oneClickSearchHintSeen';
 
 const props = defineProps({
   name: { type: String, required: true },
@@ -28,9 +25,6 @@ const active = ref(false);
 const pinned = ref(false);
 const top = ref('-10000px');
 const left = ref('0px');
-const showHint = ref(false);
-const hintLeft = ref(false);
-let hintTimer = 0;
 
 const pointer = { x: -1, y: -1 };
 
@@ -128,26 +122,6 @@ function unpin() {
   if (pinnedCategory === unpin) pinnedCategory = null;
   pinned.value = false;
   hide();
-  dismissHint();
-}
-
-function dismissHint() {
-  showHint.value = false;
-  if (hintTimer) {
-    clearTimeout(hintTimer);
-    hintTimer = 0;
-  }
-}
-
-// 首次固定时显示一次气泡，告诉用户搜索图标的作用
-function maybeShowHint() {
-  if (getValue(HINT_KEY, false)) return;
-  setValue(HINT_KEY, true);
-  const triggerRect = triggerEl.value?.getBoundingClientRect();
-  hintLeft.value = (triggerRect?.right ?? 0) + 140 > window.innerWidth;
-  showHint.value = true;
-  clearTimeout(hintTimer);
-  hintTimer = setTimeout(dismissHint, 5000);
 }
 
 function onTriggerClick() {
@@ -156,7 +130,6 @@ function onTriggerClick() {
     return;
   }
   pin();
-  maybeShowHint();
 }
 
 function onHoverShow() {
@@ -204,7 +177,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('mousemove', onDocMouseMove);
   document.removeEventListener('pointerdown', onDocPointerDown);
-  clearTimeout(hintTimer);
   if (pinnedCategory === unpin) pinnedCategory = null;
 });
 </script>
@@ -244,15 +216,6 @@ onBeforeUnmount(() => {
       />
       <span>{{ name }}</span>
     </a>
-
-    <span
-      v-if="showHint"
-      class="sej-category-hint"
-      :class="{ 'sej-category-hint-left': hintLeft }"
-      role="status"
-    >
-      点图标，一键全搜
-    </span>
 
     <Teleport :to="dropRoot">
       <div
