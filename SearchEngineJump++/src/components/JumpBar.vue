@@ -77,30 +77,44 @@ function onJumpAll(engines) {
   openAllEngines(engines, encoded, matchedRule);
 }
 
+function initSelectSearch() {
+  // 划词条本身靠 Shadow DOM 样式定位，不依赖内联样式，CSP 下也可工作
+  if (inlineStyleBlocked) {
+    console.warn('[SEJ] 检测到 CSP 阻止内联样式，划词条仍会尝试显示');
+  }
+  isSelectSearch.value = true;
+  inputTarget = () => selectionText.value;
+  insertTarget = document.body;
+  insertPosition = 'beforeend';
+  return true;
+}
+
 function initTargets() {
+  // 此类站点（如 Wikipedia）的规则只适合作为标题跳转，
+  // 开启划词搜索时优先使用划词模式，避免规则目标失效或无输入框
+  if (data.selectSearch && matchedRule?.enabled && matchedRule.selectSearchPriority) {
+    return initSelectSearch();
+  }
+
   if (matchedRule?.enabled) {
     inputTarget = getInputTarget(matchedRule);
     insertTarget = getInsertTarget(matchedRule);
     insertPosition = getInsertPositionLabel(matchedRule) || 'beforeend';
     if (!inputTarget || !insertTarget) {
       console.warn(
-        `[SEJ] 未找到输入框或插入位置，跳过初始化：\n输入框：${inputTarget}\n插入位置：${insertTarget}`,
+        `[SEJ] 未找到输入框或插入位置：\n输入框：${inputTarget}\n插入位置：${insertTarget}`,
       );
+      // 站点结构可能已改版（如 Wikipedia 的 #mw-head），回退到划词搜索
+      if (data.selectSearch) {
+        return initSelectSearch();
+      }
       return false;
     }
     return true;
   }
 
   if (data.selectSearch) {
-    if (inlineStyleBlocked) {
-      console.warn('[SEJ] 检测到 CSP 阻止内联样式，已禁用划词搜索模式');
-      return false;
-    }
-    isSelectSearch.value = true;
-    inputTarget = () => selectionText.value;
-    insertTarget = document.body;
-    insertPosition = 'beforeend';
-    return true;
+    return initSelectSearch();
   }
 
   console.info('[SEJ] 未启用搜索跳转，跳过初始化');
@@ -122,6 +136,56 @@ function injectHost() {
   }
 }
 
+const FIXED_GAP = 8;
+
+// 查找视口顶部是否存在吸顶/固定头部，返回其底边高度
+function getFixedHeaderBottom(barLeft, barWidth) {
+  let bottom = 0;
+  const consider = (el) => {
+    if (!el || el === getHost()) return;
+    const style = getComputedStyle(el);
+    if (style.position !== 'fixed' && style.position !== 'sticky') return;
+    const rect = el.getBoundingClientRect();
+    const overlapsBar =
+      rect.right > barLeft && rect.left < barLeft + barWidth;
+    if (
+      !overlapsBar &&
+      rect.width < window.innerWidth * 0.3
+    ) {
+      return;
+    }
+    if (
+      rect.top <= FIXED_GAP &&
+      rect.bottom > bottom &&
+      rect.bottom < window.innerHeight * 0.5
+    ) {
+      bottom = rect.bottom;
+    }
+  };
+
+  if (document.elementsFromPoint) {
+    // 固定后的跳转条可能盖住自己所在位置，多点取样才能找到被遮住的头部
+    const points = [
+      barLeft + barWidth / 2,
+      barLeft - 8,
+      barLeft + barWidth + 8,
+      window.innerWidth / 2,
+      window.innerWidth - 8,
+    ];
+    for (const x of points) {
+      if (x < 0 || x > window.innerWidth - 1) continue;
+      document.elementsFromPoint(x, FIXED_GAP).forEach(consider);
+    }
+  }
+
+  let el = insertTarget;
+  while (el && el !== document.documentElement) {
+    consider(el);
+    el = el.parentElement;
+  }
+  return bottom;
+}
+
 function fixedToTop(fixedTopValue, color) {
   if (!containerEl.value || inlineStyleBlocked) return;
   if (resolvedStyle.includes('sticky') || resolvedStyle.includes('fixed')) {
@@ -134,18 +198,31 @@ function fixedToTop(fixedTopValue, color) {
 
   if (originalContainerDistanceTop - window.scrollY <= fixedTop) {
     if (host.style.position !== 'fixed') {
-      host.dataset.originalLeft = container.getBoundingClientRect().left;
+      const rect = container.getBoundingClientRect();
+      host.dataset.originalLeft = rect.left;
+      host.dataset.originalWidth = rect.width;
+      // 站点头部可能在本条固定后才变为吸顶，稍后再校准一次位置
+      scheduleFixedTopRefresh();
     }
+    const left = Math.max(0, parseFloat(host.dataset.originalLeft) || 0);
+    const width = parseFloat(host.dataset.originalWidth) || 0;
+    const headerBottom = getFixedHeaderBottom(left, width);
+    const top = headerBottom > 0 ? headerBottom + FIXED_GAP : FIXED_GAP;
+
+    host.style.display = 'block';
+    // 站点样式可能约束宿主宽度，固定后按固定前的实际宽度撑开，
+    // 避免 max-width: 100% 与宿主收缩宽度互相影响导致跳转条换行
+    host.style.width = width > 0 ? `${Math.ceil(width)}px` : 'max-content';
+    host.style.maxWidth = `calc(100vw - ${left + 12}px)`;
     host.style.position = 'fixed';
-    host.style.top = `${fixedTop}px`;
-    host.style.left = `${host.dataset.originalLeft}px`;
-    host.style.zIndex = '998';
+    host.style.top = `${Math.round(top)}px`;
+    host.style.left = `${left}px`;
+    host.style.zIndex = '100000';
 
     container.style.position = 'static';
     container.style.left = '0';
     container.style.top = '0';
     container.style.gridColumn = 'auto';
-    container.style.padding = '0';
     container.style.margin = '0';
     container.style.backgroundColor = color;
   } else {
@@ -153,20 +230,41 @@ function fixedToTop(fixedTopValue, color) {
     host.style.top = '';
     host.style.left = '';
     host.style.zIndex = '';
+    host.style.display = '';
+    host.style.width = '';
+    host.style.maxWidth = '';
     delete host.dataset.originalLeft;
+    delete host.dataset.originalWidth;
 
     container.style.position = '';
     container.style.left = '';
     container.style.top = '';
     container.style.gridColumn = '';
-    container.style.padding = '';
     container.style.margin = '';
     container.style.backgroundColor = '';
   }
 }
 
+let scrollRaf = 0;
+let fixedTopTimers = [];
+
+function scheduleFixedTopRefresh() {
+  fixedTopTimers.forEach(clearTimeout);
+  fixedTopTimers = [80, 250, 600].map((delay) =>
+    setTimeout(() => {
+      if (getHost().style.position === 'fixed') {
+        fixedToTop(matchedRule?.fixedTop, matchedRule?.fixedTopColor);
+      }
+    }, delay),
+  );
+}
+
 function onScroll() {
-  fixedToTop(matchedRule?.fixedTop, matchedRule?.fixedTopColor);
+  if (scrollRaf) return;
+  scrollRaf = requestAnimationFrame(() => {
+    scrollRaf = 0;
+    fixedToTop(matchedRule?.fixedTop, matchedRule?.fixedTopColor);
+  });
 }
 
 function onWheel(e) {
@@ -176,7 +274,6 @@ function onWheel(e) {
 }
 
 function onSelectionChange() {
-  if (inlineStyleBlocked) return;
   const selection = getSelection();
   if (selection.isCollapsed) {
     barVisible.value = false;
@@ -203,6 +300,9 @@ onMounted(async () => {
 
   if (isSelectSearch.value) {
     document.addEventListener('selectionchange', onSelectionChange);
+    // 部分站点/浏览器中 selectionchange 时机不稳定，补充鼠标与键盘事件兜底
+    document.addEventListener('mouseup', onSelectionChange);
+    document.addEventListener('keyup', onSelectionChange);
   }
 
   if (
@@ -224,8 +324,12 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('selectionchange', onSelectionChange);
+  document.removeEventListener('mouseup', onSelectionChange);
+  document.removeEventListener('keyup', onSelectionChange);
   window.removeEventListener('scroll', onScroll);
   window.removeEventListener('wheel', onWheel);
+  if (scrollRaf) cancelAnimationFrame(scrollRaf);
+  fixedTopTimers.forEach(clearTimeout);
 });
 </script>
 

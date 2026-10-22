@@ -540,6 +540,7 @@ const knowledgeRules = [
   },
   {
     name: "维基百科",
+    selectSearchPriority: true,
     url: /^https?:\/\/\D{2,5}\.wikipedia\.org\/wiki/i,
     engineList: "knowledge",
     enabled: true,

@@ -18,10 +18,22 @@ export const DARK_MODE_STYLE = `
     --sej-hover-bg: rgba(255, 255, 255, 0.09);
     --sej-active-bg: rgba(255, 255, 255, 0.14);
     --sej-accent: #8ab4f8;
+    --sej-accent-weak: rgba(138, 180, 248, 0.18);
     --sej-shadow-bar: 0 1px 2px hsla(0, 0%, 0%, 0.5),
       0 8px 24px -12px hsla(0, 0%, 0%, 0.8);
     --sej-shadow-menu: 0 2px 6px hsla(0, 0%, 0%, 0.5),
       0 16px 40px -12px hsla(0, 0%, 0%, 0.85);
+    --sej-surface-2: rgba(255, 255, 255, 0.045);
+    --sej-surface-hover: rgba(255, 255, 255, 0.09);
+    --sej-input-bg: #17181a;
+    --sej-btn-bg: rgba(255, 255, 255, 0.04);
+    --sej-checkbox-border: #4a5459;
+    --sej-focus-ring: rgba(138, 180, 248, 0.3);
+    --sej-accent-contrast: #202124;
+    --sej-danger: #f28b82;
+    --sej-danger-weak: rgba(242, 139, 130, 0.14);
+    --sej-panel-shadow: 0 24px 64px -20px hsla(0, 0%, 0%, 0.85),
+      0 2px 8px hsla(0, 0%, 0%, 0.5);
   }
 `;
 

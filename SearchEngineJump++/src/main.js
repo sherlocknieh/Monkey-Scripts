@@ -13,9 +13,9 @@ const CSP_COMPAT_STYLE = `
   .sej-engine-icon { width: 16px; height: 16px; flex: 0 0 auto; object-fit: cover; display: inline-block; }
   .sej-engine-icon:not([src]) { display: none; }
   .sej-category-title { font-weight: 600; padding: 0 12px; opacity: 0.8; }
-  #newSearchBox #iqxin-newTarget { border-radius: 4px; border: none; padding: 2px 0 2px 2px; }
+  #newSearchBox #iqxin-newTarget { border-radius: 8px; border: 1px solid var(--border-color-sej); padding: 7px 9px; }
   .iqxin-help-link { color: #999; }
-  #iqxin-editCodeBox textarea { overflow: auto; border-radius: 4px; }
+  #iqxin-editCodeBox textarea { overflow: auto; border-radius: 10px; }
   .iqxin-warning { color: red; font-size: 1.2em; }
   #sej-drop-lists { display: contents; }
 `;
@@ -29,12 +29,16 @@ const NON_TRANSITION_STYLE = `
 
 // 关闭设置面板动画（transtion: false）
 const SETTINGS_NON_TRANSITION_STYLE = `
-  #settingLayer, #btnEle span, #btnEle2, .iqxin-set-del,
+  #settingLayer, #btnEle span, .iqxin-set-del,
   span.iqxin-additem, #newSearchBox, .addItemBoxBtn, #settingLayerMask {
     transition: none;
   }
   #settingLayerMask { animation: none; }
   #settingLayerMask { backdrop-filter: none; }
+  #settingLayer { animation: none; }
+  .sej-panel-close {
+    transition: none;
+  }
 `;
 
 // 这些站点需要等待页面内容渲染后再初始化

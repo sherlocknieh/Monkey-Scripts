@@ -11,9 +11,8 @@ import { GM_deleteValue } from '$';
 import { useSettings, STORAGE_KEY } from '../stores/settings.js';
 import { requestRestart } from '../core/appControl.js';
 import { closeSettingPanel, showToast } from '../stores/ui.js';
-import { EDIT, DEL } from '../data/icons.js';
+import { EDIT, DEL, EYE, EYE_OFF } from '../data/icons.js';
 import EngineEditDialog from './EngineEditDialog.vue';
-import CategoryEditDialog from './CategoryEditDialog.vue';
 import ConfigEditor from './ConfigEditor.vue';
 
 const settings = useSettings();
@@ -65,13 +64,13 @@ const layerEl = ref(null);
 const maskEl = ref(null);
 const maskVisible = ref(false);
 const layerStyle = ref({});
-const addDelMode = ref(false);
-const moreOpen = ref(false);
 const editingCategory = ref(-1);
 const engineDialog = ref(null);
-const categoryDialog = ref(false);
 const configOpen = ref(false);
 const online = ref(false);
+
+const UNDO_DURATION = 5000;
+const undoStack = [];
 
 const editIcon = EDIT;
 const delIcon = DEL;
@@ -143,10 +142,6 @@ function close() {
     closeTimer = setTimeout(finishClose, 400);
 }
 
-function toggleAddDel() {
-    addDelMode.value = !addDelMode.value;
-}
-
 function toggleCategory(index) {
     const category = draft.categories[index];
     category.enabled = !category.enabled;
@@ -159,12 +154,94 @@ function toggleEngine(ci, ei) {
     showToast(engine.disable ? '禁用' : '启用');
 }
 
+function pushUndo(entry) {
+    undoStack.push(entry);
+    if (undoStack.length > 20) undoStack.shift();
+}
+
+function undoDelete() {
+    if (engineDialog.value || configOpen.value) {
+        showToast('请先关闭当前对话框');
+        return;
+    }
+    const entry = undoStack.pop();
+    if (!entry) return;
+
+    if (entry.type === 'category') {
+        const index = Math.min(entry.index, draft.categories.length);
+        draft.categories.splice(index, 0, entry.item);
+    } else {
+        const category = draft.categories.find(
+            (item) => item.key === entry.categoryKey,
+        );
+        if (!category) {
+            undoStack.push(entry);
+            showToast('无法撤销：分类已不存在');
+            return;
+        }
+        const index = Math.min(entry.index, category.engines.length);
+        category.engines.splice(index, 0, entry.item);
+    }
+
+    editingCategory.value = -1;
+    showToast(`已撤销删除${entry.label}`);
+}
+
+function notifyDeleted(entry, label) {
+    pushUndo({ ...entry, label });
+    showToast(`已删除${label}`, UNDO_DURATION, {
+        label: '撤销',
+        onClick: undoDelete,
+    });
+}
+
 function deleteCategory(index) {
+    const category = draft.categories[index];
+    if (!category) return;
+    notifyDeleted(
+        {
+            type: 'category',
+            index,
+            item: JSON.parse(JSON.stringify(category)),
+        },
+        `分类「${category.name}」`,
+    );
     draft.categories.splice(index, 1);
 }
 
 function deleteEngine(ci, ei) {
-    draft.categories[ci].engines.splice(ei, 1);
+    const category = draft.categories[ci];
+    const engine = category?.engines?.[ei];
+    if (!engine) return;
+    notifyDeleted(
+        {
+            type: 'engine',
+            categoryKey: category.key,
+            index: ei,
+            item: JSON.parse(JSON.stringify(engine)),
+        },
+        `「${engine.name}」`,
+    );
+    category.engines.splice(ei, 1);
+}
+
+function onKeydown(e) {
+    if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+    if (e.key.toLowerCase() !== 'z') return;
+    if (!undoStack.length) return;
+
+    // 事件跨 Shadow DOM 重定向，composedPath 才能拿到真实目标
+    const target = e.composedPath?.()[0] || e.target;
+    if (
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.isContentEditable
+    ) {
+        return;
+    }
+
+    e.preventDefault();
+    undoDelete();
 }
 
 function startRenameCategory(index) {
@@ -248,19 +325,27 @@ function submitEngine(engine) {
     engineDialog.value = null;
 }
 
-function openCategoryDialog() {
-    categoryDialog.value = true;
+function createCategoryKey() {
+    const base = 'user' + Date.now();
+    let key = base;
+    let index = 1;
+    while (draft.categories.some((category) => category.key === key)) {
+        key = `${base}-${index++}`;
+    }
+    return key;
 }
 
-function submitCategory({ name, innerName }) {
+async function addCategory() {
     draft.categories.push({
         _id: nextId(),
-        name,
-        key: innerName,
+        name: '新分类',
+        key: createCategoryKey(),
         enabled: true,
         engines: [],
     });
-    categoryDialog.value = false;
+    await nextTick();
+    const body = layerEl.value?.querySelector('#sej-settings-body');
+    if (body) body.scrollTop = body.scrollHeight;
 }
 
 function isOnline() {
@@ -353,6 +438,7 @@ function startDrag(e) {
 
 onMounted(() => {
     document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', onKeydown);
     isOnline();
     nextTick(() => {
         maskVisible.value = true;
@@ -361,6 +447,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     document.body.style.overflow = 'auto';
+    document.removeEventListener('keydown', onKeydown);
     clearTimeout(closeTimer);
     document.removeEventListener('mousemove', onDragMove);
     document.removeEventListener('mouseup', stopDrag);
@@ -370,13 +457,11 @@ onBeforeUnmount(() => {
 <template>
     <div id="settingLayerMask" ref="maskEl" :style="{ display: 'flex', opacity: maskVisible ? 1 : 0 }" @click.self="close" @transitionend="onMaskTransitionEnd">
         <div id="settingLayer" ref="layerEl" :style="layerStyle" @click.stop>
-            <div id="dragDom" style="
-          height: 16px;
-          width: 97%;
-          position: absolute;
-          top: 0;
-          cursor: move;
-        " @mousedown="startDrag"></div>
+            <div class="sej-panel-header" @mousedown="startDrag">
+                <span class="sej-panel-title">搜索跳转设置</span>
+                <button type="button" class="sej-panel-close" title="关闭" aria-label="关闭"
+                    @click.stop="close" @mousedown.stop>✕</button>
+            </div>
             <!-- 设置主体区域 -->
             <div id="sej-settings-body">
                 <!-- 分类列表 -->
@@ -385,15 +470,18 @@ onBeforeUnmount(() => {
                     <!-- 类别标题 -->
                     <div class="sejtitle drag" draggable="true" :data-xin="category.enabled ? 1 : -1"
                         :data-iqxintitle="category.key" @dragstart="onDragStart($event, 'category', ci)"
-                        @dragover.prevent @drop="onDrop($event, 'category', ci)" @click="toggleCategory(ci)">
+                        @dragover.prevent @drop="onDrop($event, 'category', ci)">
                         <input v-if="editingCategory === ci" id="titleEdit" type="text" :value="category.name"
                             @click.stop @keydown.enter="finishRenameCategory(ci, $event)"
                             @keydown.esc="cancelRenameCategory" @blur="finishRenameCategory(ci, $event)" />
                         <span v-else class="iqxin-pointer-events">{{ category.name }}</span>
+                        <span class="iqxin-set-toggle" :class="{ 'iqxin-set-hidden': !category.enabled }"
+                            :title="category.enabled ? '隐藏' : '显示'" @click.stop="toggleCategory(ci)"
+                            v-html="category.enabled ? EYE : EYE_OFF"></span>
                         <span class="iqxin-title-edit" title="编辑 Edit" @click.stop="startRenameCategory(ci)">
                             <img class="sej-engine-icon" :src="editIcon" alt="" />
                         </span>
-                        <span class="iqxin-set-title-del" :class="{ 'iqxin-set-active': addDelMode }" title="删除 Delete"
+                        <span class="iqxin-set-title-del" title="删除 Delete"
                             @click.stop="deleteCategory(ci)">
                             <img class="sej-engine-icon" :src="delIcon" alt="" />
                         </span>
@@ -408,105 +496,93 @@ onBeforeUnmount(() => {
                             <span class="sej-engine" :data-iqxintitle="engine.name" :data-iqxinimg="engine.favicon"
                                 :data-iqxinlink="engine.url" :data-iqxintarget="engine.blank ? '_blank' : null"
                                 :data-iqxindisabled="engine.disable ? 'true' : null"
-                                :data-iqxingbk="engine.gbk ? 'true' : null" @click="toggleEngine(ci, ei)">
+                                :data-iqxingbk="engine.gbk ? 'true' : null">
                                 <img class="sej-engine-icon" :src="engine.favicon" alt="" />
                                 <span>{{ engine.name }}</span>
                             </span>
+                            <span class="iqxin-set-toggle" :class="{ 'iqxin-set-hidden': engine.disable }"
+                                :title="engine.disable ? '显示' : '隐藏'" @click.stop="toggleEngine(ci, ei)"
+                                v-html="engine.disable ? EYE_OFF : EYE"></span>
                             <span class="iqxin-set-edit" title="编辑 Edit" @click.stop="editEngine(ci, ei)">
                                 <img class="sej-engine-icon" :src="editIcon" alt="" />
                             </span>
-                            <span class="iqxin-set-del" :class="{ 'iqxin-set-active': addDelMode }" title="删除 Delete"
+                            <span class="iqxin-set-del" title="删除 Delete"
                                 @click.stop="deleteEngine(ci, ei)">
                                 <img class="sej-engine-icon" :src="delIcon" alt="" />
                             </span>
                         </span>
                         <!-- 添加搜索引擎按钮(默认隐藏) -->
-                        <span class="iqxin-additem" :class="{ 'iqxin-set-active': addDelMode }"
-                            @click.stop="addEngine(ci)">+</span>
+                        <span class="iqxin-additem" @click.stop="addEngine(ci)">+</span>
                     </div>
                 </div>
-            </div>
-            <!-- 更多设置按钮 -->
-            <div id="btnEle2" :class="{ btnEle2active: moreOpen }">
-                <div>
-                    <span id="xin-modification" title="配置文件" @click="openConfig">
-                        配置文件
-                    </span>
-                    <span id="xin-selectSearch" title="划词搜索">
-                        <label>划词搜索<input type="checkbox" v-model="draft.selectSearch" /></label>
-                    </span>
-                    <span id="xin-transtion" title="动画">
-                        <label>动画<input type="checkbox" v-model="draft.transtion" /></label>
-                    </span>
-                    <span id="xin-foldlists" title="折叠当前搜索分类">
-                        <label>折叠当前搜索分类<input type="checkbox" v-model="draft.foldlist" /></label>
-                    </span>
-                    <span id="iqxin-fixedTopS" title="固定到顶端">
-                        <label>固定到顶端<input type="checkbox" v-model="draft.fixedTop" /></label>
-                    </span>
-                    <span id="iqxin-fixedTopUpward" title="仅上拉显示">
-                        <label>仅上拉显示<input type="checkbox" v-model="draft.fixedTopUpward" /></label>
-                    </span>
-                    <span id="xin-HideTheSameLink" title="隐藏同站链接">
-                        <label>隐藏同站链接<input type="checkbox" v-model="draft.HideTheSameLink" /></label>
-                    </span>
+                <!-- 新增分类占位卡片 -->
+                <div class="iqxin-items sej-add-category-card" role="button" tabindex="0"
+                    title="添加列表" aria-label="添加列表"
+                    @click="addCategory" @keydown.enter="addCategory" @keydown.space.prevent="addCategory">
+                    <span class="sej-add-category-plus">+</span>
                 </div>
             </div>
             <!-- 底部设置按钮 -->
             <div id="btnEle">
                 <div class="btnEleLayer">
-                    <span class="feedback" title="在 GreasyFork 进行反馈">
-                        <a target="_blank" href="https://greasyfork.org/en/scripts/454280-searchenginejumpplus">Greasy
-                            Fork</a>
-                    </span>
-                    <span class="feedback" title="在 Github 进行反馈">
-                        <a target="_blank" href="https://github.com/MUTED64/SearchEngineJumpPlus">GitHub</a>
-                    </span>
-                    <span id="xin-allOpen" title="后台打开该搜索分类的所有网站">
-                        <label>一键搜索<input type="checkbox" v-model="draft.allOpen" /></label>
-                    </span>
-                    <span id="xin-centerDisplay" title="居中显示">
-                        居中：
-                        <select v-model.number="draft.center">
-                            <option :value="0">默认</option>
-                            <option :value="1">强制</option>
-                            <option :value="2">自动</option>
-                        </select>
-                    </span>
-                    <span id="xin-newtab" title="是否采用新标签页打开">
-                        打开方式：
-                        <select v-model.number="draft.newtab">
-                            <option :value="0">默认页面</option>
-                            <option :value="1">新标签页</option>
-                        </select>
-                    </span>
-                    <span id="xin-addDel" title="增加新的或者删除现有的搜索" :class="{ 'iqxin-btn-active': addDelMode }"
-                        @click="toggleAddDel">增加 / 删除</span>
-                    <span id="moreSet" title="more set" :class="{ 'iqxin-btn-active': moreOpen }"
-                        @click="moreOpen = !moreOpen">更多设置</span>
-                    <span id="xin-save" title="save & close" @click="save">保存并关闭</span>
+                    <div class="sej-footer-links">
+                        <span class="feedback" title="在 GreasyFork 进行反馈">
+                            <a target="_blank" href="https://greasyfork.org/en/scripts/454280-searchenginejumpplus">Greasy
+                                Fork</a>
+                        </span>
+                        <span class="feedback" title="在 Github 进行反馈">
+                            <a target="_blank" href="https://github.com/MUTED64/SearchEngineJumpPlus">GitHub</a>
+                        </span>
+                    </div>
+                    <div class="sej-footer-options">
+                        <span id="xin-modification" title="配置文件" @click="openConfig">
+                            配置文件
+                        </span>
+                        <span id="xin-allOpen" title="后台打开该搜索分类的所有网站">
+                            <label>一键搜索<input type="checkbox" v-model="draft.allOpen" /></label>
+                        </span>
+                        <span id="xin-selectSearch" title="划词搜索">
+                            <label>划词搜索<input type="checkbox" v-model="draft.selectSearch" /></label>
+                        </span>
+                        <span id="xin-transtion" title="动画">
+                            <label>动画<input type="checkbox" v-model="draft.transtion" /></label>
+                        </span>
+                        <span id="xin-foldlists" title="折叠当前搜索分类">
+                            <label>折叠当前搜索分类<input type="checkbox" v-model="draft.foldlist" /></label>
+                        </span>
+                        <span id="iqxin-fixedTopS" title="固定到顶端">
+                            <label>固定到顶端<input type="checkbox" v-model="draft.fixedTop" /></label>
+                        </span>
+                        <span id="iqxin-fixedTopUpward" title="仅上拉显示">
+                            <label>仅上拉显示<input type="checkbox" v-model="draft.fixedTopUpward" /></label>
+                        </span>
+                        <span id="xin-HideTheSameLink" title="隐藏同站链接">
+                            <label>隐藏同站链接<input type="checkbox" v-model="draft.HideTheSameLink" /></label>
+                        </span>
+                        <span id="xin-centerDisplay" title="居中显示">
+                            居中：
+                            <select v-model.number="draft.center">
+                                <option :value="0">默认</option>
+                                <option :value="1">强制</option>
+                                <option :value="2">自动</option>
+                            </select>
+                        </span>
+                        <span id="xin-newtab" title="是否采用新标签页打开">
+                            打开方式：
+                            <select v-model.number="draft.newtab">
+                                <option :value="0">默认页面</option>
+                                <option :value="1">新标签页</option>
+                            </select>
+                        </span>
+                    </div>
+                    <div class="sej-footer-actions">
+                        <span id="xin-save" title="save & close" @click="save">保存并关闭</span>
+                    </div>
                 </div>
             </div>
 
-            <span id="nSearchList" :class="{ 'iqxin-set-active': addDelMode }" style="
-          position: absolute;
-          bottom: 10%;
-          right: 5%;
-          padding: 5px 10px;
-          border-radius: 4px;
-          border: 1px solid #ec6d51;
-          color: #ec6d51;
-          cursor: pointer;
-          background: #fff;
-          visibility: hidden;
-          opacity: 0;
-          transition: 0.3s;
-        " @click="openCategoryDialog">增加新的搜索列表</span>
-
             <EngineEditDialog v-if="engineDialog" :mode="engineDialog.mode" :initial="engineDialog.initial"
                 :resolve-icon="getICON" @submit="submitEngine" @cancel="engineDialog = null" />
-
-            <CategoryEditDialog v-if="categoryDialog" @submit="submitCategory" @cancel="categoryDialog = false" />
 
             <ConfigEditor v-if="configOpen" :initial-text="configText" @save="saveConfig" @reset="reset"
                 @close="configOpen = false" @copy="showToast('复制成功')" />

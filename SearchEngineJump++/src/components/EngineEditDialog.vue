@@ -34,31 +34,39 @@ function submit() {
 
 <template>
   <div id="newSearchBox">
-    <span>标&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;题 : </span>
-    <input ref="titleInput" v-model="form.name" placeholder="必填" />
-    <br /><br />
-    <span>链&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;接 : </span>
-    <input v-model="form.url" placeholder="必填" />
-    <br /><br />
-    <span>图&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;标 : </span>
-    <input v-model="form.favicon" placeholder="选填,留空则自动获取" />
-    <br /><br />
-    <span>
-      打开方式 :
+    <div class="sej-dialog-title">
+      {{ mode === 'edit' ? '编辑搜索引擎' : '添加搜索引擎' }}
+    </div>
+    <label class="sej-field">
+      <span>标题</span>
+      <input ref="titleInput" v-model="form.name" placeholder="必填" />
+    </label>
+    <label class="sej-field">
+      <span>链接</span>
+      <input v-model="form.url" placeholder="必填" />
+    </label>
+    <label class="sej-field">
+      <span>图标</span>
+      <input v-model="form.favicon" placeholder="选填，留空则自动获取" />
+    </label>
+    <label class="sej-field">
+      <span>打开方式</span>
       <select id="iqxin-newTarget" v-model="form.blank">
         <option :value="true">新标签页打开</option>
         <option :value="false">当前页打开</option>
       </select>
-    </span>
-    <br /><br />
-    <span v-if="mode === 'edit'">
-      <label>GBK编码：<input v-model="form.gbk" type="checkbox" /></label>
-    </span>
-    <br /><br />
-    <button class="addItemBoxBtn iqxin-enterBtn" @click="submit">确定</button>
-    &nbsp;&nbsp;&nbsp;
-    <button class="addItemBoxBtn iqxin-closeBtn" @click="$emit('cancel')">
-      取消
-    </button>
+    </label>
+    <label v-if="mode === 'edit'" class="sej-field-inline">
+      <input v-model="form.gbk" type="checkbox" />
+      <span>GBK 编码</span>
+    </label>
+    <div class="sej-dialog-actions">
+      <button class="addItemBoxBtn iqxin-closeBtn" @click="$emit('cancel')">
+        取消
+      </button>
+      <button class="addItemBoxBtn iqxin-enterBtn" @click="submit">
+        确定
+      </button>
+    </div>
   </div>
 </template>
