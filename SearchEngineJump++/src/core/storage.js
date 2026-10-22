@@ -2,6 +2,11 @@ import { GM_getValue, GM_setValue, GM_deleteValue } from '$';
 
 const memoryFallback = new Map();
 const asyncCache = new Map();
+const asyncLoaded = new Set();
+// 各键最近一次已知值，用于判断 GM 存储是否真的发生了变化。
+// 不能拿 localStorage 比较：它只属于当前站点，同一个 GM 值在每个站点
+// 都会被当成“有新变化”，从而导致无限重启和重复提示。
+const lastKnown = new Map();
 const LOCAL_PREFIX = 'sej:storage:';
 const TS_SUFFIX = ':updatedAt';
 const PROBE_KEY = 'sej:probe:' + Date.now();
@@ -10,6 +15,48 @@ const PROBE_KEY = 'sej:probe:' + Date.now();
 let backend = 'local';
 let readyPromise = null;
 let warned = false;
+
+function stableStringify(value) {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(',')}]`;
+  }
+  const keys = Object.keys(value).sort();
+  return `{${keys
+    .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+    .join(',')}}`;
+}
+
+/**
+ * 比较两份设置是否等价（忽略对象键顺序）。
+ */
+export function isSameValue(a, b) {
+  try {
+    return stableStringify(a) === stableStringify(b);
+  } catch (e) {
+    return false;
+  }
+}
+
+function cloneValue(value) {
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (e) {
+    return value;
+  }
+}
+
+function remember(key, value) {
+  if (isPresent(value)) lastKnown.set(key, cloneValue(value));
+}
+
+function forget(key) {
+  lastKnown.delete(key);
+  asyncCache.delete(key);
+  asyncLoaded.delete(key);
+}
 
 function gmNamespace() {
   return typeof globalThis !== 'undefined' ? globalThis.GM : undefined;
@@ -112,8 +159,10 @@ async function preloadAsync(keys) {
     keys.map(async (key) => {
       try {
         const value = await gm['getValue'](key);
+        asyncLoaded.add(key);
         if (isPresent(value)) {
           asyncCache.set(key, value);
+          remember(key, value);
           return;
         }
         // GM 中没有记录时，把本站点已有的 localStorage 配置迁回 GM，
@@ -121,7 +170,8 @@ async function preloadAsync(keys) {
         const local = readLocal(key);
         if (isPresent(local)) {
           asyncCache.set(key, local);
-          await gm['setValue'](key, local);
+          remember(key, local);
+          await gm['setValue'](key, cloneValue(local));
         }
       } catch (e) {
         console.warn('[SEJ] 读取 GM 存储失败', key, e);
@@ -146,6 +196,16 @@ export function initStorage(keys = []) {
         backend = 'local';
         warnOnce();
       }
+      if (backend === 'gm-sync') {
+        for (const key of keys) {
+          try {
+            const value = GM_getValue(key);
+            if (isPresent(value)) remember(key, value);
+          } catch (e) {
+            console.warn('[SEJ] 读取 GM 存储失败', key, e);
+          }
+        }
+      }
       console.info(`[SEJ] 设置存储后端：${backend}`);
       return backend;
     })();
@@ -161,53 +221,74 @@ export function getValue(key, defaultValue) {
   if (backend === 'gm-sync') {
     try {
       const value = GM_getValue(key);
-      if (isPresent(value)) return value;
+      if (isPresent(value)) {
+        remember(key, value);
+        return cloneValue(value);
+      }
+      return defaultValue;
     } catch (e) {
-      console.warn('[SEJ] GM_getValue 失败，尝试 localStorage', e);
+      // 读取失败时清掉已知值，让后续轮询能够重新拉取并恢复设置
+      lastKnown.delete(key);
+      console.warn('[SEJ] GM_getValue 失败，使用默认值', e);
+      return defaultValue;
     }
-  } else if (backend === 'gm-async') {
-    if (asyncCache.has(key)) return asyncCache.get(key);
   }
 
-  const local = readLocal(key);
-  if (isPresent(local)) return local;
+  if (backend === 'gm-async') {
+    if (asyncCache.has(key)) return cloneValue(asyncCache.get(key));
+    if (asyncLoaded.has(key)) return defaultValue;
+  }
 
-  if (memoryFallback.has(key)) return memoryFallback.get(key);
+  if (backend === 'local') {
+    const local = readLocal(key);
+    if (isPresent(local)) return local;
+
+    if (memoryFallback.has(key)) return cloneValue(memoryFallback.get(key));
+  }
 
   return defaultValue;
 }
 
 export function setValue(key, value) {
   const updatedAt = Date.now();
+  const plain = cloneValue(value);
   let stored = 'memory';
 
   if (backend === 'gm-sync') {
     try {
-      GM_setValue(key, value);
+      GM_setValue(key, plain);
       GM_setValue(key + TS_SUFFIX, updatedAt);
       stored = 'gm';
     } catch (e) {
       console.warn('[SEJ] GM_setValue 失败，尝试 localStorage', e);
     }
   } else if (backend === 'gm-async') {
-    asyncCache.set(key, value);
+    asyncCache.set(key, plain);
+    asyncLoaded.add(key);
     const gm = gmNamespace();
     try {
-      Promise.resolve(gm['setValue'](key, value)).catch((e) =>
-        console.warn('[SEJ] GM.setValue 失败', e),
-      );
+      Promise.resolve(gm['setValue'](key, plain)).catch((e) => {
+        console.warn('[SEJ] GM.setValue 失败，退回 localStorage', e);
+        writeLocal(key, plain);
+        writeLocal(key + TS_SUFFIX, updatedAt);
+      });
       stored = 'gm';
     } catch (e) {
       console.warn('[SEJ] GM.setValue 失败', e);
     }
   }
 
-  // 同时镜像一份到 localStorage：同站点快速读取，也可作为降级备份
-  if (writeLocal(key, value)) {
-    writeLocal(key + TS_SUFFIX, updatedAt);
-    if (stored === 'memory') stored = 'local';
-  } else if (stored === 'memory') {
-    memoryFallback.set(key, value);
+  remember(key, plain);
+
+  // 仅在 GM 存储不可用时才使用站点 localStorage，避免占用站点配额
+  // 或留下只在单个域名下生效的陈旧副本
+  if (backend === 'local' || stored === 'memory') {
+    if (writeLocal(key, plain)) {
+      writeLocal(key + TS_SUFFIX, updatedAt);
+      if (stored === 'memory') stored = 'local';
+    } else if (stored === 'memory') {
+      memoryFallback.set(key, plain);
+    }
   }
 
   return stored;
@@ -235,7 +316,7 @@ export function deleteValue(key) {
   removeLocal(key);
   removeLocal(key + TS_SUFFIX);
   memoryFallback.delete(key);
-  asyncCache.delete(key);
+  forget(key);
 }
 
 /**
@@ -249,9 +330,11 @@ export function watchValue(key, callback) {
 
   const handleRemote = (newValue) => {
     if (!isPresent(newValue)) return;
-    asyncCache.set(key, newValue);
-    writeLocal(key, newValue);
-    callback(newValue);
+    const plain = cloneValue(newValue);
+    asyncCache.set(key, plain);
+    asyncLoaded.add(key);
+    remember(key, plain);
+    callback(plain);
   };
 
   const addListener =
@@ -293,6 +376,7 @@ export function watchValue(key, callback) {
 
   const localKey = LOCAL_PREFIX + key;
   const onStorage = (event) => {
+    if (backend !== 'local') return;
     if (event.key !== localKey || event.newValue === null) return;
     try {
       callback(JSON.parse(event.newValue));
@@ -313,28 +397,33 @@ export function watchValue(key, callback) {
 
 /**
  * 主动拉取最新值（用于不支持变更监听的脚本管理器，如 Greasemonkey 4）。
- * 返回新值；无变化时返回 null。
+ * 与上次已知值比较，返回新值；无变化时返回 null。
  */
 export async function pullLatest(key) {
   const gm = gmNamespace();
 
   try {
+    let value;
+
     if (backend === 'gm-async') {
-      const value = await gm['getValue'](key);
-      if (!isPresent(value)) return null;
-      const current = asyncCache.get(key);
-      if (JSON.stringify(value) === JSON.stringify(current)) return null;
-      asyncCache.set(key, value);
-      writeLocal(key, value);
-      return value;
+      value = await gm['getValue'](key);
+      asyncLoaded.add(key);
+    } else if (backend === 'gm-sync') {
+      value = GM_getValue(key);
+    } else {
+      return null;
     }
 
-    if (backend === 'gm-sync') {
-      const value = GM_getValue(key);
-      if (!isPresent(value)) return null;
-      if (JSON.stringify(value) === JSON.stringify(readLocal(key))) return null;
-      return value;
-    }
+    if (!isPresent(value)) return null;
+
+    const current = lastKnown.get(key);
+    if (isPresent(current) && isSameValue(value, current)) return null;
+
+    const plain = cloneValue(value);
+    lastKnown.set(key, plain);
+    asyncCache.set(key, plain);
+    asyncLoaded.add(key);
+    return plain;
   } catch (e) {
     console.warn('[SEJ] 拉取最新设置失败', e);
   }

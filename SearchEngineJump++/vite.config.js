@@ -13,7 +13,7 @@ export default defineConfig({
       userscript: {
         name: 'SearchEngineJump++',
         namespace:'https://github.com/sherlocknieh/Monkey-Scripts',
-        version: '2026.10.22.23',
+        version: '2026.10.22.24',
         author: 'NLF(原作者) & 锐经(改) & iqxin(改) & MUTED64(改) & sherlocknieh(改)',
         description: 'Fork 自 MUTED64 的 SearchEngineJumpPLus, 用 Vue3 重构, 修复诸多问题, 并进行了大幅简化,美化和优化。',
         license: 'MIT',

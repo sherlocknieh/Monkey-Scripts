@@ -1,7 +1,7 @@
 import { reactive } from 'vue';
 import defaultEngines from '../data/engineList.js';
 import rules from '../data/rules.js';
-import { getValue, setValue } from '../core/storage.js';
+import { getValue, setValue, isSameValue } from '../core/storage.js';
 import { XIAOHONGSHU, X_ICON, TIEBA } from '../data/favicons.js';
 
 export const STORAGE_KEY = 'searchEngineJumpData';
@@ -53,6 +53,15 @@ function migrateLegacyKeys(data) {
   }
   if (has('engineDetails')) {
     delete data.engineDetails;
+    changed = true;
+  }
+  // 旧版本会把分类派生数据写进 engineList，导致每次读取都和内存中的
+  // 设置不一致，引起无休止的“跨页面同步”重启。这里顺手清理掉。
+  if (
+    data.engineList &&
+    Object.prototype.hasOwnProperty.call(data.engineList, 'engineCategories')
+  ) {
+    delete data.engineList.engineCategories;
     changed = true;
   }
   return changed;
@@ -203,10 +212,9 @@ export class Settings {
       this.checkUpdate();
     } else {
       this.settingData = this.scriptSettingData;
-      setValue(STORAGE_KEY, this.settingData);
+      // 不主动写入默认值：存储探测/读取失败时也返回空值，
+      // 此时写回会把默认配置覆盖到已有配置上（部分站点曾出现该问题）。
     }
-
-    this.initEngineCategories();
   }
 
   // 原地应用新设置：保持 settingData 引用不变，供已挂载的组件响应
@@ -219,7 +227,6 @@ export class Settings {
     pruneUnknownKeys(this.settingData, this.scriptSettingData);
     Object.assign(this.settingData, plain);
     this.storedSettingData = this.settingData;
-    this.initEngineCategories();
     return setValue(STORAGE_KEY, this.settingData);
   }
 
@@ -227,34 +234,14 @@ export class Settings {
   reload() {
     const stored = getValue(STORAGE_KEY, null);
     if (!stored || typeof stored !== 'object') return false;
-    try {
-      if (
-        this.settingData &&
-        JSON.stringify(stored) === JSON.stringify(this.settingData)
-      ) {
-        return false;
-      }
-    } catch (e) {
-      // 比较失败时仍然重新加载
+    migrateLegacyKeys(stored);
+    if (this.settingData && isSameValue(stored, this.settingData)) {
+      return false;
     }
     this.storedSettingData = stored;
     this.settingData = Object.assign({}, stored);
     this.checkSettingDataIntegrity();
-    this.initEngineCategories();
     return true;
-  }
-
-  initEngineCategories() {
-    this.settingData.engineList.engineCategories = [];
-    for (let i = 0; i < this.settingData.engineCategories.length; i++) {
-      if (this.settingData.engineCategories[i][2]) {
-        this.settingData.engineList.engineCategories[i] =
-          this.settingData.engineCategories[i];
-      } else {
-        this.settingData.engineList.engineCategories[-i] =
-          this.settingData.engineCategories[i];
-      }
-    }
   }
 
   getMatchedRule() {

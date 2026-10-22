@@ -231,7 +231,7 @@ function setupSettingsSync() {
 
   // 部分管理器（如 Greasemonkey 4）没有变更监听，靠轮询兜底
   const poll = async () => {
-    if (ui.settingPanelOpen || document.hidden) return;
+    if (!app || ui.settingPanelOpen || document.hidden) return;
     const latest = await pullLatest(STORAGE_KEY);
     if (latest) applyRemoteSettings();
   };
