@@ -7,6 +7,8 @@
 - [PornHubTool](https://github.com/sherlocknieh/Monkey-Scripts/raw/main/PornHubTool/dist/pornhub-tool.user.js
 )
 
+- [DeepSeek-KaTeX-Copy-Fix](https://github.com/sherlocknieh/Monkey-Scripts/raw/main/deepseek-katex-copy-fix.user.js)
+
 
 
 ## 开发指南
