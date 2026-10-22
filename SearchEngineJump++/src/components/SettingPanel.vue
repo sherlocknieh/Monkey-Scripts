@@ -46,7 +46,7 @@ function makeDraft() {
     const raw = JSON.parse(JSON.stringify(source));
     const d = {};
     for (const key of OPTION_KEYS) d[key] = raw[key];
-    d.categories = raw.engineDetails.map(([name, key, enabled]) => ({
+    d.categories = raw.engineCategories.map(([name, key, enabled]) => ({
         _id: nextId(),
         name,
         key,
@@ -87,7 +87,7 @@ const configText = computed(() => {
 function buildResult() {
     const result = {};
     for (const key of OPTION_KEYS) result[key] = draft[key];
-    result.engineDetails = draft.categories.map((cat) => [
+    result.engineCategories = draft.categories.map((cat) => [
         cat.name,
         cat.key,
         cat.enabled,
@@ -702,7 +702,7 @@ onBeforeUnmount(() => {
                 @cancel="cancelEngineDialog" />
 
             <ConfigEditor v-if="configOpen" :initial-text="configText" @save="saveConfig" @reset="reset"
-                @close="configOpen = false" @copy="showToast('复制成功')" />
+                @close="configOpen = false" @copy="showToast('复制成功')" @notify="showToast" />
         </div>
     </div>
 </template>

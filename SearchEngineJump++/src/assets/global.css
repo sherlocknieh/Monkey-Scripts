@@ -722,6 +722,9 @@ span.iqxin-additem:hover {
   border-color: var(--sej-accent);
   box-shadow: 0 0 0 3px var(--sej-focus-ring);
 }
+#iqxin-editCodeBox .sej-file-input {
+  display: none;
+}
 .iqxin-warning {
   color: var(--sej-danger);
   font-size: 14px;

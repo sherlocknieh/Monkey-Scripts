@@ -39,7 +39,7 @@ let resolvedStyle = '';
 let originalContainerDistanceTop = 0;
 
 const categories = computed(() =>
-  data.engineDetails
+  data.engineCategories
     .filter(([, , enabled]) => enabled)
     .map(([name, key]) => ({
       name,

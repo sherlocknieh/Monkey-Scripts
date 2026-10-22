@@ -26,7 +26,7 @@ function createDefaultSettings() {
     icon: 1,
     transtion: true,
     selectSearch: true,
-    engineDetails: [
+    engineCategories: [
       ['网页', 'web', true],
       ['翻译', 'translate', true],
       ['知识', 'knowledge', true],
@@ -42,6 +42,33 @@ function createDefaultSettings() {
     ],
     engineList: defaultEngines,
   };
+}
+
+// 旧版本使用 engineDetails，读取时迁移为 engineCategories
+function migrateLegacyKeys(data) {
+  if (!data || typeof data !== 'object') return false;
+  const has = (key) => Object.prototype.hasOwnProperty.call(data, key);
+  let changed = false;
+  if (!has('engineCategories') && has('engineDetails')) {
+    data.engineCategories = data.engineDetails;
+    changed = true;
+  }
+  if (has('engineDetails')) {
+    delete data.engineDetails;
+    changed = true;
+  }
+  return changed;
+}
+
+function pruneUnknownKeys(data, defaults) {
+  let changed = false;
+  for (const key of Object.keys(data)) {
+    if (!Object.prototype.hasOwnProperty.call(defaults, key)) {
+      delete data[key];
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 function isVersionOutdated(storedVersion, currentVersion) {
@@ -81,18 +108,17 @@ export class Settings {
   }
 
   checkSettingDataIntegrity() {
+    let changed = migrateLegacyKeys(this.settingData);
+    changed =
+      pruneUnknownKeys(this.settingData, this.scriptSettingData) || changed;
     for (const value in this.scriptSettingData) {
       if (!Object.prototype.hasOwnProperty.call(this.settingData, value)) {
         console.warn(`[SEJ] 属性不存在：${value}`);
         this.settingData[value] = this.scriptSettingData[value];
-        setValue(STORAGE_KEY, this.settingData);
+        changed = true;
       }
     }
-    // 旧版本遗留的说明字段
-    if (Object.prototype.hasOwnProperty.call(this.settingData, 'message')) {
-      delete this.settingData.message;
-      setValue(STORAGE_KEY, this.settingData);
-    }
+    if (changed) setValue(STORAGE_KEY, this.settingData);
   }
 
   checkUpdate() {
@@ -187,8 +213,12 @@ export class Settings {
 
   // 原地应用新设置：保持 settingData 引用不变，供已挂载的组件响应
   applySettings(next) {
-    const merged = Object.assign({}, this.scriptSettingData, next);
+    const source = Object.assign({}, next);
+    migrateLegacyKeys(source);
+    const merged = Object.assign({}, this.scriptSettingData, source);
+    pruneUnknownKeys(merged, this.scriptSettingData);
     const plain = JSON.parse(JSON.stringify(merged));
+    pruneUnknownKeys(this.settingData, this.scriptSettingData);
     Object.assign(this.settingData, plain);
     this.storedSettingData = this.settingData;
     this.initEngineCategories();
@@ -218,13 +248,13 @@ export class Settings {
 
   initEngineCategories() {
     this.settingData.engineList.engineCategories = [];
-    for (let i = 0; i < this.settingData.engineDetails.length; i++) {
-      if (this.settingData.engineDetails[i][2]) {
+    for (let i = 0; i < this.settingData.engineCategories.length; i++) {
+      if (this.settingData.engineCategories[i][2]) {
         this.settingData.engineList.engineCategories[i] =
-          this.settingData.engineDetails[i];
+          this.settingData.engineCategories[i];
       } else {
         this.settingData.engineList.engineCategories[-i] =
-          this.settingData.engineDetails[i];
+          this.settingData.engineCategories[i];
       }
     }
   }
