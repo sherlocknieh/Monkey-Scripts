@@ -212,12 +212,12 @@ let pollTimer = null;
 
 function applyRemoteSettings() {
   if (ui.settingPanelOpen) {
-    showToast('其他页面已更新设置，关闭设置面板后刷新页面生效', 3000);
+    showToast('SearchEngineJump++: 其他页面已更新设置，关闭设置面板后刷新页面生效', 3000);
     return;
   }
   if (!useSettings().reload()) return;
   restart();
-  showToast('设置已从其他页面同步');
+  showToast('SearchEngineJump++: 已从其他页面同步配置');
 }
 
 function setupSettingsSync() {
