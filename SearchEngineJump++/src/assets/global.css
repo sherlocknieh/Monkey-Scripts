@@ -964,6 +964,48 @@ body[qxintheme="dark"] {
 .sej-category {
   display: inline-flex;
   align-items: center;
+  position: relative;
+}
+.sej-category-hint {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  z-index: 100000001;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(32, 33, 36, 0.94);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  transform: translateY(-50%);
+  animation: sej-hint-in 0.16s ease-out;
+}
+.sej-category-hint::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  border: 5px solid transparent;
+  border-right-color: rgba(32, 33, 36, 0.94);
+  transform: translateY(-50%);
+}
+.sej-category-hint-left {
+  left: auto;
+  right: calc(100% + 8px);
+}
+.sej-category-hint-left::after {
+  right: auto;
+  left: 100%;
+  border-right-color: transparent;
+  border-left-color: rgba(32, 33, 36, 0.94);
+}
+@keyframes sej-hint-in {
+  from {
+    opacity: 0;
+  }
 }
 .sej-category-search-icon {
   display: inline-flex;
