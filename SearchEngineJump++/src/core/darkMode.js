@@ -9,11 +9,19 @@ export const DARK_MODE_STYLE = `
     --background-active-enable-qxin: #274144;
     --background-active-disable-qxin: #583535;
     --background-hover-color-qxin: #424242;
-    --trigger-shown-qxin: #424242 !important;
+    --trigger-shown-qxin: #3c4043 !important;
     --background-btn-qxin: #292f36;
     --background-setting-qxin: #202124;
     --box-shadow-color-sej: hsla(0, 0%, 70%, 10%);
     --border-color-sej: #3b4547;
+    --sej-bar-bg: rgba(32, 33, 36, 0.9);
+    --sej-hover-bg: rgba(255, 255, 255, 0.09);
+    --sej-active-bg: rgba(255, 255, 255, 0.14);
+    --sej-accent: #8ab4f8;
+    --sej-shadow-bar: 0 1px 2px hsla(0, 0%, 0%, 0.5),
+      0 8px 24px -12px hsla(0, 0%, 0%, 0.8);
+    --sej-shadow-menu: 0 2px 6px hsla(0, 0%, 0%, 0.5),
+      0 16px 40px -12px hsla(0, 0%, 0%, 0.85);
   }
 `;
 

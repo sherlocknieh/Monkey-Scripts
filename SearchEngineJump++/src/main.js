@@ -10,9 +10,9 @@ import { openSettingPanel, closeSettingPanel } from './stores/ui.js';
 
 // 严格 CSP 页面的兼容样式
 const CSP_COMPAT_STYLE = `
-  .sej-engine-icon { width: 16px; height: 16px; object-fit: cover; display: inline-block; }
+  .sej-engine-icon { width: 16px; height: 16px; flex: 0 0 auto; object-fit: cover; display: inline-block; }
   .sej-engine-icon:not([src]) { display: none; }
-  .sej-category-title { font-weight: 600; padding: 0 8px; opacity: 0.8; }
+  .sej-category-title { font-weight: 600; padding: 0 12px; opacity: 0.8; }
   #newSearchBox #iqxin-newTarget { border-radius: 4px; border: none; padding: 2px 0 2px 2px; }
   .iqxin-help-link { color: #999; }
   #iqxin-editCodeBox textarea { overflow: auto; border-radius: 4px; }
@@ -22,7 +22,7 @@ const CSP_COMPAT_STYLE = `
 
 // 关闭跳转条动画（transtion: false）
 const NON_TRANSITION_STYLE = `
-  .sej-engine, .sej-drop-list-trigger, .sej-drop-list { transition: none !important; }
+  .sej-engine, .sej-drop-list-trigger, .sej-drop-list { transition: none !important; animation: none !important; }
   #sej-container { animation: none !important; }
   .sej-drop-list { backdrop-filter: none !important; }
 `;

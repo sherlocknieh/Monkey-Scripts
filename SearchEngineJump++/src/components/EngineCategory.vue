@@ -17,13 +17,8 @@ const triggerEl = ref(null);
 const listEl = ref(null);
 const shown = ref(false);
 const active = ref(false);
-const top = ref('0px');
+const top = ref('-10000px');
 const left = ref('0px');
-
-const SHOW_DELAY = 60;
-const HIDE_DELAY = 0;
-let showTimer = null;
-let hideTimer = null;
 
 const pointer = { x: -1, y: -1 };
 
@@ -40,48 +35,68 @@ function hitTest(el) {
   );
 }
 
+// 指针落在触发项与菜单之间的空隙时也保持展开，避免穿缝时闪断
+function hitTestBridge() {
+  const trigger = triggerEl.value;
+  const list = listEl.value;
+  if (!trigger || !list) return false;
+  const t = trigger.getBoundingClientRect();
+  const l = list.getBoundingClientRect();
+  if (!l.width || !l.height) return false;
+  const gapTop = Math.min(t.bottom, l.top);
+  const gapBottom = Math.max(t.bottom, l.top);
+  return (
+    pointer.x >= Math.min(t.left, l.left) &&
+    pointer.x <= Math.max(t.right, l.right) &&
+    pointer.y >= gapTop &&
+    pointer.y <= gapBottom
+  );
+}
+
+function isPointerInside() {
+  return hitTest(triggerEl.value) || hitTest(listEl.value) || hitTestBridge();
+}
+
 function measureAndPosition() {
   if (!triggerEl.value || !listEl.value) return;
   const rect = triggerEl.value.getBoundingClientRect();
   const listRect = listEl.value.getBoundingClientRect();
   const listWidth = listRect.width;
   const listHeight = listRect.height;
+  const GAP = 6;
 
   let posLeft = rect.left - (listWidth - rect.width) / 2;
   posLeft = Math.max(8, Math.min(posLeft, window.innerWidth - listWidth - 8));
 
-  let posTop = rect.bottom;
-  if (posTop + listHeight > window.innerHeight - 8 && rect.top - listHeight > 8) {
-    posTop = rect.top - listHeight;
+  let posTop = rect.bottom + GAP;
+  if (
+    posTop + listHeight > window.innerHeight - 8 &&
+    rect.top - listHeight - GAP > 8
+  ) {
+    posTop = rect.top - listHeight - GAP;
   }
 
   top.value = posTop + 'px';
   left.value = posLeft + 'px';
 }
 
-function show() {
-  clearTimeout(hideTimer);
+async function show() {
   if (shown.value) {
     active.value = true;
     return;
   }
-  clearTimeout(showTimer);
-  showTimer = setTimeout(async () => {
-    if (!triggerEl.value) return;
-    shown.value = true;
-    await nextTick();
-    measureAndPosition();
-    active.value = true;
-  }, SHOW_DELAY);
+  if (!triggerEl.value) return;
+  shown.value = true;
+  await nextTick();
+  if (!shown.value) return;
+  measureAndPosition();
+  active.value = true;
 }
 
 function scheduleHide() {
-  clearTimeout(hideTimer);
-  hideTimer = setTimeout(() => {
-    if (hitTest(triggerEl.value) || hitTest(listEl.value)) return;
-    active.value = false;
-    shown.value = false;
-  }, HIDE_DELAY);
+  if (isPointerInside()) return;
+  active.value = false;
+  shown.value = false;
 }
 
 // 用指针坐标统一判定是否仍在触发器/子菜单范围内，
@@ -91,8 +106,7 @@ function onDocMouseMove(e) {
   pointer.y = e.clientY;
   if (!shown.value) return;
 
-  if (hitTest(triggerEl.value) || hitTest(listEl.value)) {
-    clearTimeout(hideTimer);
+  if (isPointerInside()) {
     active.value = true;
   } else {
     scheduleHide();
@@ -105,8 +119,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('mousemove', onDocMouseMove);
-  clearTimeout(showTimer);
-  clearTimeout(hideTimer);
 });
 </script>
 
@@ -137,7 +149,7 @@ onBeforeUnmount(() => {
           left,
           opacity: active ? 1 : 0.2,
           pointerEvents: shown ? 'auto' : 'none',
-          transition: 'opacity 0.1s ease-out',
+          transition: 'opacity 0.06s ease-out',
           zIndex: 100000000,
         }"
         @mouseenter="show"
