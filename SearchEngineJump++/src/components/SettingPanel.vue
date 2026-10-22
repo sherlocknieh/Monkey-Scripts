@@ -32,7 +32,6 @@ const OPTION_KEYS = [
     'fixedTopUpward',
     'baiduOffset',
     'getIcon',
-    'allOpen',
     'HideTheSameLink',
     'center',
     'icon',
@@ -651,9 +650,6 @@ onBeforeUnmount(() => {
                     <div class="sej-footer-options">
                         <span id="xin-modification" title="配置文件" @click="openConfig">
                             配置文件
-                        </span>
-                        <span id="xin-allOpen" title="后台打开该搜索分类的所有网站">
-                            <label>一键搜索<input type="checkbox" v-model="draft.allOpen" /></label>
                         </span>
                         <span id="xin-selectSearch" title="划词搜索">
                             <label>划词搜索<input type="checkbox" v-model="draft.selectSearch" /></label>

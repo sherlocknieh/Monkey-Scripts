@@ -20,7 +20,6 @@ function createDefaultSettings() {
     fixedTopUpward: false,
     baiduOffset: -120,
     getIcon: 0,
-    allOpen: false,
     HideTheSameLink: true,
     center: 2,
     icon: 1,

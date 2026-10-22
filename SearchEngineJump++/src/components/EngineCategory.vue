@@ -1,3 +1,8 @@
+<script>
+// 模块级共享，确保所有类别实例共用同一固定状态
+let pinnedCategory = null;
+</script>
+
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { getFaviconSrc } from '../core/favicon.js';
@@ -8,7 +13,6 @@ const props = defineProps({
   name: { type: String, required: true },
   engines: { type: Array, required: true },
   iconMode: { type: Number, default: 1 },
-  allOpen: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['jump', 'jumpAll']);
@@ -107,20 +111,40 @@ function hide() {
 }
 
 // 点击类别固定下拉面板，再次点击收起；固定后不再响应指针离开
-function onTriggerClick() {
-  if (pinned.value) {
-    pinned.value = false;
-    hide();
-    return;
-  }
+function pin() {
+  if (pinnedCategory && pinnedCategory !== unpin) pinnedCategory();
+  pinnedCategory = unpin;
   pinned.value = true;
   show();
-  if (props.allOpen) emit('jumpAll');
+}
+
+function unpin() {
+  if (pinnedCategory === unpin) pinnedCategory = null;
+  pinned.value = false;
+  hide();
+}
+
+function onTriggerClick() {
+  if (pinned.value) {
+    unpin();
+    return;
+  }
+  pin();
+}
+
+function onHoverShow() {
+  if (pinnedCategory && pinnedCategory !== unpin) return;
+  show();
+}
+
+// 常驻后标题图标会变成搜索图标，点击它执行一键搜索全部分类
+function onTriggerAction() {
+  unpin();
+  emit('jumpAll');
 }
 
 function onEngineJump(engine) {
-  pinned.value = false;
-  hide();
+  unpin();
   emit('jump', engine);
 }
 
@@ -142,8 +166,7 @@ function onDocPointerDown(e) {
   if (!pinned.value) return;
   const path = e.composedPath ? e.composedPath() : [];
   if (path.includes(triggerEl.value) || path.includes(listEl.value)) return;
-  pinned.value = false;
-  hide();
+  unpin();
 }
 
 onMounted(() => {
@@ -154,11 +177,12 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('mousemove', onDocMouseMove);
   document.removeEventListener('pointerdown', onDocPointerDown);
+  if (pinnedCategory === unpin) pinnedCategory = null;
 });
 </script>
 
 <template>
-  <span class="sej-category" @mouseenter="show" @mouseleave="scheduleHide">
+  <span class="sej-category" @mouseenter="onHoverShow" @mouseleave="scheduleHide">
     <a
       ref="triggerEl"
       class="sej-engine sej-drop-list-trigger"
@@ -167,8 +191,24 @@ onBeforeUnmount(() => {
       :aria-expanded="shown"
       @click.prevent.stop="onTriggerClick"
     >
+      <span
+        v-if="pinned"
+        class="sej-category-search-icon"
+        role="button"
+        tabindex="0"
+        :title="`一键搜索全部：${name}`"
+        :aria-label="`一键搜索全部：${name}`"
+        @click.stop.prevent="onTriggerAction"
+        @keydown.enter.stop.prevent="onTriggerAction"
+        @keydown.space.stop.prevent="onTriggerAction"
+      >
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <circle cx="7" cy="7" r="4.5" />
+          <path d="m10.5 10.5 3 3" />
+        </svg>
+      </span>
       <img
-        v-if="iconMode && getFaviconSrc(engines[0])"
+        v-else-if="iconMode && getFaviconSrc(engines[0])"
         class="sej-engine-icon"
         :src="getFaviconSrc(engines[0])"
         alt=""

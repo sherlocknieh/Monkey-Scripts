@@ -361,7 +361,6 @@ onBeforeUnmount(() => {
         :name="category.name"
         :engines="category.engines"
         :icon-mode="data.icon"
-        :all-open="data.allOpen"
         @jump="onJump"
         @jump-all="onJumpAll(category.engines)"
       />
