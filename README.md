@@ -22,7 +22,7 @@
 
 - 描述: 一个用于增强 LinkSwift 使用体验的油猴脚本
 - 项目仓库: https://github.com/sherlocknieh/LinkSwift
-- 安装:  [https://github.com/sherlocknieh/LinkSwift/raw/main/（改）网盘直链下载助手.user.js
+- 安装:  [https://github.com/sherlocknieh/LinkSwift/raw/dev/（改）网盘直链下载助手.user.js
 ](https://github.com/sherlocknieh/LinkSwift/raw/dev/（改）网盘直链下载助手.user.js)
 
 ### DeepSeek-KaTeX-Copy-Fix
