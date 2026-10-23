@@ -21,8 +21,8 @@
 ### LinkSwift
 - 描述: 一个用于增强 LinkSwift 使用体验的油猴脚本
 - 项目仓库: https://github.com/sherlocknieh/LinkSwift
-- 安装:  https://github.com/sherlocknieh/LinkSwift/raw/main/%EF%BC%88%E6%94%B9%EF%BC%89%E7%BD%91%E7%9B%98%E7%9B%B4%E9%93%BE%E4%B8%8B%E8%BD%BD%E5%8A%A9%E6%89%8B.user.js
-
+- 安装:  [https://github.com/sherlocknieh/LinkSwift/raw/main/（改）网盘直链下载助手.user.js
+](https://github.com/sherlocknieh/LinkSwift/raw/dev/（改）网盘直链下载助手.user.js)
 ## 本仓库中的简单脚本
 
 ### DeepSeek-KaTeX-Copy-Fix
