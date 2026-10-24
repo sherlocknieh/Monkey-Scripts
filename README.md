@@ -18,13 +18,6 @@
 - 项目仓库: https://github.com/sherlocknieh/PornHubTool
 - 安装: https://github.com/sherlocknieh/PornHubTool/raw/main/dist/pornhub-tool.user.js
 
-### LinkSwift
-
-- 描述: 一个用于增强 LinkSwift 使用体验的油猴脚本
-- 项目仓库: https://github.com/sherlocknieh/LinkSwift
-- 安装:  [https://github.com/sherlocknieh/LinkSwift/raw/dev/（改）网盘直链下载助手.user.js
-](https://github.com/sherlocknieh/LinkSwift/raw/dev/（改）网盘直链下载助手.user.js)
-
 ### DeepSeek-KaTeX-Copy-Fix
 
 - 描述: 修复 DeepSeek 中的 KaTeX 公式复制问题; 
